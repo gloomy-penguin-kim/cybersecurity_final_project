@@ -22,6 +22,14 @@ import re
 logger = logging.getLogger("uvicorn.error")
 
 # --- Models ---
+class AttackSimple(SQLModel, table=True): 
+    attack_id: Optional[int] = Field(default=None, primary_key=True)
+    name: str 
+    module: str  
+    rank: Optional[str]
+    disclosed: Optional[str] 
+    check_supported: Optional[str] 
+    type: Optional[str]
 
 class Attack(SQLModel, table=True):
     __tablename__ = "attacks_attack"
@@ -194,12 +202,12 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
-
-child = pexpect.spawnu('msfconsole')
+ 
 
 PAGE_SIZE = 50 
 
-@app.get("/attacks/", response_model=List[AttackRead])
+# AttackRead 
+@app.get("/attacks/", response_model=List[AttackSimple])
 def read_attacks(
     session: SessionDep,
     offset: int = 0,

@@ -2,6 +2,8 @@ import pexpect
 import sqlite3
 import sys
 import os
+import re
+import time
 
 msf_type = sys.argv[1]
 base_path = sys.argv[2]
@@ -16,6 +18,10 @@ if not os.path.exists(os.path.join(base_path, "database.db")):
     print("Database does not exist in " + base_path)
     sys.exit(1)
 
+def clean_line(line):
+    line = line.decode('utf-8')
+    ansi_escape = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', line) 
 
 sqliteConnection = sqlite3.connect(database)
 cursor = sqliteConnection.cursor()
@@ -43,8 +49,32 @@ def insert_data(table_name, data_array, returning_id):
 
     except sqlite3.Error as e:
         print(f"Database error: {e}")
+        raise Exception("Database error")
 
-msf_type = "post"
+def update_descr(attack_id, payload_default):
+    try:
+    
+        values = (payload_default, attack_id)
+        query = "update attacks_attack set payload_default = ? where attack_id = ?"
+
+        print(query)
+        print(values)
+
+        if (dry_run != "dry_run"):
+            cursor.execute(query, values)
+            sqliteConnection.commit()
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+
+
+def find_nth(haystack: str, needle: str, n: int) -> int:
+    start = haystack.find(needle)
+    while start >= 0 and n > 1:
+        start = haystack.find(needle, start + len(needle))
+        n -= 1
+    return start
+
 filename = os.path.join(base_path, msf_type + "_search.txt")
 json_filename =os.path.join(base_path, msf_type + "_json.txt")
 info_filename = os.path.join(base_path, msf_type + "_info.txt")
@@ -61,9 +91,11 @@ lines = child_options.before.splitlines()
 exploits = False
 data = []
 line_number = 0
+
+
 # with open(filename, 'w') as file:
 for line in lines:
-    line = line.decode('utf-8')
+    line = clean_line(line)
     if "show " + msf_type in line:
         exploits = True
     if exploits:
@@ -85,15 +117,167 @@ for line in lines:
 
 # child_options.sendline('exit')
 #
-# child_options = pexpect.spawn('msfconsole')
+#child_options = pexpect.spawn('msfconsole')
 child_options.setwinsize(400, 1200)
-child_options.expect(['msf6'])  # Wait for prompt
+#child_options.expect(['msf6'])  # Wait for prompt
+
+def payload_payload():
+    child_options.sendline('show payloads')
+    time.sleep(3)
+    child_options.expect('msf6 *')
+    lines = child_options.before.splitlines()
+    child_options.expect('msf6 *')
+    lines = child_options.before.splitlines()
+
+    print(lines)
+
+    lines1 = lines[9:]
+    payloads = []
+
+    for line1 in lines1:
+        line1 = clean_line(line1)
+        splits = line1.split()
+        if len(splits) >= 6:
+            row = {"order_by": int(splits[0]),
+                   "payload": splits[1],
+                   "disclosure": splits[2],
+                   "rank": splits[3],
+                   "check_supported": splits[4],
+                   "description": " ".join(splits[5:])
+                   }
+            payloads.append(row)
+            # insert into datumbase
+            payload_id = insert_data("attacks_payload", row, "payload_id")
+
+            #okie dokie artichokie
+
+            child_options.sendline('options ' + row['payload'])
+            child_options.expect('msf6 *')
+            options = child_options.before.splitlines()
+            child_options.expect('msf6 *')
+            options = child_options.before.splitlines()
+
+            after_title = False
+            section_line_count = 0
+            section_count = 0
+            section = { "attack_id": "", "title": "" }
+            heading_start_pos = []
+            options = options[2:]
+            heading_line = ""
+            payload_default = ""
+
+            for option_line in options:
+                option_line = clean_line(option_line)
+                section_line_count += 1
+
+                if 'View the full module info with the info, or info -d command.' in option_line:
+                    break
+                if option_line != "":
+                    if section_line_count == 1:
+                        if "**" in option_line.strip():
+                            section_line_count = 0
+                            var_name = option_line.split(':')[0].replace("**","").strip()
+                            var_value = option_line.split(':')[1].split()[0]
+                            var_descr = " ".join(option_line.split(':')[1].split()[1:])
+
+                            section_count += 1
+                            option_heading_id = insert_data('attacks_option_heading',
+                                                            { "attack_id": payload_id,
+                                                              "title": "Extra Things",
+                                                              "order_by": section_count,
+                                                              "type": "payload"},
+                                                            "option_heading_id")
+                            insert_data("attacks_option",
+                                        { "name": var_name,
+                                                    "current_setting": var_value,
+                                                    "description": var_descr,
+                                                    "option_heading_id": option_heading_id},
+                                        "option_id")
+
+                            continue
+                        section = {"attack_id": payload_id,
+                                   'title': option_line}
+                        headings_array = []
+                        heading_line = ""
+                        heading_start_pos = []
+                        after_title = True
+                        print(section)
+                        heading_line = option_line.strip()
+                        if heading_line.strip() != "Exploit target:":
+                            section_count += 1
+                            name = ""
+                            if "(" in heading_line:
+                                name = heading_line[heading_line.index('(')+1:len(heading_line)-2]
+                            option_heading_id = insert_data('attacks_option_heading',
+                                                            { "attack_id": payload_id,
+                                                                        "title": heading_line,
+                                                                        "name": name,
+                                                                        "order_by": section_count,
+                                                                        "type":"Payload"},
+                                                            "option_heading_id")
+                        else: break
+
+                    # headings
+                    if section_line_count == 3:
+                        heading_line = option_line
+
+                    # dashes
+                    if section_line_count == 4:
+                        dashes = option_line
+                        index = 0
+                        for i in range(len(option_line.split())):
+                            pos = find_nth(option_line, " -", i + 1) + 1
+                            heading_start_pos.append(pos)
+
+                        i = 0
+                        for start_pos in heading_start_pos:
+                            end_pos = len(heading_line)
+                            if i + 1 < len(heading_start_pos):
+                                end_pos = heading_start_pos[i + 1]
+                            heading = heading_line[start_pos:end_pos].strip()
+                            headings_array.append(heading.replace(" ","_"))
+                            i += 1
+
+
+                    # options start here
+                    if section_line_count > 4:
+                        after_title = False
+                        i = 0
+                        section_options = {}
+                        for start_pos in heading_start_pos:
+                            end_pos = len(option_line)
+                            if i + 1 < len(heading_start_pos):
+                                end_pos = heading_start_pos[i + 1]
+                            if "Description" in headings_array[i]:
+                                section_options[headings_array[i]] = option_line[start_pos:end_pos]
+                            else:
+                                section_options[headings_array[i]] = option_line[start_pos:end_pos].strip()
+                            i += 1
+
+                        if section['title'] != "Exploit Target:":
+                            section_options['option_heading_id'] = option_heading_id
+                            section_options['order_by'] = section_line_count - 4
+                            insert_data("attacks_option", section_options, "option_id")
+
+                        #section["options"].append(section_options)
+                        print(section_options)
+                        #insert_data("attack_option",section_options)
+
+                if not after_title and option_line.strip() == "":
+                    section = { "attack_id": "", "title": "" }
+                    section_line_count = 0
+                    option_heading_id = 0
+                    heading_line = ""
+
+
+#payload_payload()
+
 
 def options_n_stuff(module, attack_id):
     child_options.sendline('options ' + module)
 
     lines = child_options.after.splitlines()
-    while 'options ' + name not in lines[0].decode('utf-8'):
+    while 'options ' + module not in clean_line(lines[0]):
         child_options.expect('msf6')
         lines = child_options.before.splitlines()
 
@@ -106,8 +290,10 @@ def options_n_stuff(module, attack_id):
     heading_start_pos = []
     lines = lines[2:]
     heading_line = ""
+    payload_default = ""
+
     for line in lines:
-        line = line.decode('utf-8')
+        line = clean_line(line)
         section_line_count += 1
 
         if 'View the full module info with the info, or info -d command.' in line:
@@ -124,12 +310,14 @@ def options_n_stuff(module, attack_id):
                     option_heading_id = insert_data('attacks_option_heading',
                                                     { "attack_id": attack_id,
                                                                 "title": "Extra Things",
-                                                                "order_by": section_count},
+                                                                "order_by": section_count,
+                                                                "type": "other"},
                                                     "option_heading_id")
                     insert_data("attacks_option",
                                 { "name": var_name,
                                             "current_setting": var_value,
-                                            "description": var_descr},
+                                            "description": var_descr,
+                                            "option_heading_id": option_heading_id},
                                 "option_id")
 
                     continue
@@ -141,15 +329,28 @@ def options_n_stuff(module, attack_id):
                 heading_start_pos = []
                 after_title = True
                 print(section)
-                heading_line = line
+                heading_line = line.strip() 
                 if heading_line.strip() != "Exploit target:":
                     section_count += 1
+                    type = "Other"
+                    if "Module" in line: type = "Module"
+                    elif "Payload" in line: type = "Payload_from"
+
+                    name = ""
+                    if "(" in heading_line:
+                        name = heading_line[heading_line.index('(')+1:len(heading_line)-2]
+
                     option_heading_id = insert_data('attacks_option_heading',
                                                     { "attack_id": attack_id,
                                                                 "title": heading_line,
-                                                                "order_by": section_count},
+                                                                "name": name,
+                                                                "order_by": section_count,
+                                                                "type":type},
                                                     "option_heading_id")
                 else: break
+
+                if "Payload options" in line:
+                    payload_default = "payload/" + line[line.index('(') + 1:len(line) - 2]
 
 
             # headings
@@ -203,14 +404,46 @@ def options_n_stuff(module, attack_id):
             section_line_count = 0
             option_heading_id = 0
             heading_line = ""
+    return payload_default
 
 
-def find_nth(haystack: str, needle: str, n: int) -> int:
-    start = haystack.find(needle)
-    while start >= 0 and n > 1:
-        start = haystack.find(needle, start + len(needle))
-        n -= 1
-    return start
+
+
+def payloads_n_stuff(module, attack_id):
+    lines = []
+
+    child_options.sendline('use ' + name)
+    lines = child_options.after.splitlines()
+    while 'msf6' not in clean_line(lines[0]):
+        child_options.expect('msf6 *')
+        lines = child_options.before.splitlines()
+
+    child_options.sendline('show payloads')
+    lines = child_options.after.splitlines()
+    while 'show payloads' not in clean_line(lines[0]):
+        child_options.expect('msf6 *')
+        lines = child_options.before.splitlines()
+
+    print(lines)
+
+    lines = lines[9:]
+
+    for line in lines:
+        line = clean_line(line)
+        splits = line.split()
+        if len(splits) >= 6:
+            row = {"order_by": int(splits[0]),
+                   "payload": splits[1],
+                   "disclosure": splits[2],
+                   "rank": splits[3],
+                   "check_supported": splits[4],
+                   "description": " ".join(splits[5:]),
+                   "attack_id": attack_id
+                   }
+            insert_data('attacks_attack_payload', row, "attack_payload_id")
+
+
+
 
 if data:
 
@@ -226,7 +459,7 @@ if data:
 
 
         child.sendline('info ' + name)
-        while 'info ' + name not in lines[0].decode('utf-8'):
+        while 'info ' + name not in clean_line(lines[0]):
             child.expect('msf6 *')
             lines = child.before.splitlines()
 
@@ -260,7 +493,7 @@ if data:
             options_array = [];
             targets_array = [];
             for line in lines:
-                line = line.decode('utf-8')
+                line = clean_line(line)
 
                 if any(x in line for x in headings):
                     head = line.split(':')[0].strip().replace(" ", "_")
@@ -284,7 +517,6 @@ if data:
                     # headings
                     if options_count == 1:
                         heading_line = line
-
                     # dashes
                     if options_count == 2:
                         dashes = line
@@ -379,8 +611,11 @@ if data:
                     for tar in targets_array:
                         tar['attack_id'] = attack_id
                         insert_data("attacks_target", tar, "target_id")
-
-                    options_n_stuff(descr['Module'], attack_id)
+                        
+                    payloads_n_stuff(descr['Module'], attack_id)
+                    
+                    payload_default = options_n_stuff(descr['Module'], attack_id)
+                    if payload_default != "": update_descr(attack_id, payload_default)
 
                 if write_to_file:
                     file.write(line)

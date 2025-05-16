@@ -1,7 +1,9 @@
 import sqlite3
+import sys
+import os 
 
  
-base_path = sys.argv[1] 
+base_path = "/home/kim/Documents/Output" #sys.argv[1]
 database = os.path.join(base_path, "database.db") 
 
 if not os.path.exists(os.path.join(base_path, "database.db")):
@@ -17,4 +19,6 @@ cursor.execute("delete from attacks_option_heading", {})
 cursor.execute("delete from attacks_attack", {})
 cursor.execute("delete from attacks_option", {})
 cursor.execute("delete from attacks_target", {})
+cursor.execute("delete from attacks_attack_payload", {})
+cursor.execute("delete from attacks_payload", {})
 sqliteConnection.commit()
