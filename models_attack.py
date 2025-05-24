@@ -1,15 +1,6 @@
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Relationship
 
-#from models_payload import Payload
-
-
-class AttackPayloadLink(SQLModel, table=True):
-    __tablename__ = "attacks_attack_payload"
-    attack_id: Optional[int] = Field(default=None, foreign_key="attacks_attack.attack_id", primary_key=True)
-    payload_id: Optional[int] = Field(default=None, foreign_key="attacks_payload.payload_id", primary_key=True)
-
-
 
 class AttackSimple(SQLModel, table=True):
     attack_id: Optional[int] = Field(default=None, primary_key=True)
@@ -43,11 +34,6 @@ class Attack(SQLModel, table=True):
     refs: Optional[str]
     type: Optional[str]
     payload_default: Optional[str]
-
     option_headings: Optional[List["ModuleOptionHeading"]] = Relationship(back_populates="attack")
+    payload_headings: Optional[List["Payload"]] = Relationship(back_populates="attack")
     targets: Optional[List["Target"]] = Relationship(back_populates="attack")
-
-    payload_options: List["Payload"] = Relationship(
-        back_populates="attacks",
-        link_model=AttackPayloadLink
-    )

@@ -123,6 +123,24 @@ def get_table_counts():
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
+def get_payload_id(payload):
+    try:
+        values = (payload,)
+        query = "select payload_id from attacks_payload where payload = ? order by payload_id limit 1"
+
+        if (dry_run != "dry_run"):
+            cursor.execute(query, values)
+            row = cursor.fetchone()
+            (paylaod_id,) = row if row else None
+
+            sqliteConnection.commit()
+
+            return paylaod_id
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+
+
 def find_nth(haystack: str, needle: str, n: int) -> int:
     start = haystack.find(needle)
     while start >= 0 and n > 1:
@@ -332,21 +350,21 @@ def payloads_n_stuff(module, attack_id):
     for line in lines:
         line = clean_line(line)
         splits = line.split()
-        if len(splits) >= 6:
-            insert_with_payload_key_key(attack_id, splits[1])
-            # row = {"order_by": int(splits[0]),
-            #        "payload": splits[1],
-            #        "disclosure": splits[2],
-            #        "rank": splits[3],
-            #        "check_supported": splits[4],
-            #        "description": " ".join(splits[5:]),
-            #        "attack_id": attack_id
-            #        }
-            # insert_data('attacks_attack_payload', row, "attack_payload_id")
+        if len(splits) >= 6 and splits[0][0] != '-':
+            payload_id = get_payload_id(str(splits[1]))
+            row = {"order_by": int(splits[0]),
+                   "payload": splits[1],
+                   "disclosure": splits[2],
+                   "rank": splits[3],
+                   "check_supported": splits[4],
+                   "description": " ".join(splits[5:]),
+                   "attack_id": attack_id,
+                   "payload_id": payload_id
+                   }
+            insert_data('attacks_attack_payload', row, "attack_payload_id")
 
 
-
-# data = [{"name": "exploit/aix/local/ibstat_path"}]
+data = [{"name": "exploit/aix/local/ibstat_path"}]
 if data:
 
     with open(info_filename, 'w') as file:

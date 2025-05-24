@@ -5,7 +5,7 @@ from sqlalchemy.orm import load_only
 import logging
 
 from fastapi import Depends, FastAPI, Query
-from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select
+from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select, join
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -110,7 +110,7 @@ from sqlmodel import Session, select
 from typing import List
 
 from models_payload import (
-    Payload, PayloadOptionHeading, PayloadOption,
+    PayloadOptionHeading, PayloadOption,
     PayloadResponse, PayloadOptionHeadingResponse, PayloadOptionResponse
 )
 from models_options import (
@@ -126,6 +126,9 @@ from models_attack import (
 from models_response import (
     AttackResponse
 )
+# from models_attack_payload import (
+#     AttackPayload, AttackPayloadResponse
+# )
 
 @app.get("/attacks", response_model=List[AttackSimple])
 def read_attacks(
@@ -157,94 +160,106 @@ def post_attacks(
 
 
 
-
-@app.get("/attacks/{attack_id}", response_model=AttackResponse)
-def getOneAttack(
-        attack_id,
-        session: Session = Depends(get_session)
-    ) -> AttackResponse:
-
-    statement = (
-        select(Attack)
-        .where(Attack.attack_id == attack_id)
-        .options(
-            #selectinload(Attack.payloads
-        selectinload(Attack.payload_options).selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options),
-        selectinload(Attack.targets),
-        selectinload(Attack.option_headings),
-        )
-    )
-    result = session.exec(statement).first()
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Attack not found")
-
-    return build_attack_response(result)
-
-def build_attack_response(attack: Attack) -> AttackResponse:
-    return AttackResponse(
-        attack_id=attack.attack_id,
-        name=attack.name,
-        module=attack.module,
-        platform=attack.platform,
-        arch=attack.arch,
-        privileged=attack.privileged,
-        license=attack.license,
-        rank=attack.rank,
-        disclosed=attack.disclosed,
-        provided_by=attack.provided_by,
-        module_side_effects=attack.module_side_effects,
-        module_stability=attack.module_stability,
-        module_reliability=attack.module_reliability,
-        check_supported=attack.check_supported,
-        payload_information=attack.payload_information,
-        description=attack.description,
-        refs=attack.refs,
-        type=attack.type,
-        payload_default=attack.payload_default,
-        option_headings=[
-            ModuleOptionHeadingResponse(
-                attack_id=attack.attack_id,
-                order_by=option_heading.order_by,
-                name=option_heading.name,
-                title=option_heading.title,
-                type=option_heading.type
-            )
-            for option_heading in (attack.option_headings or [])
-        ],
-        payload_headings=[
-            PayloadOptionHeadingResponse(
-                payload_id=heading.payload_id,
-                order_by=str(heading.order_by) if heading.order_by is not None else None,
-                name=heading.name,
-                title=heading.title,
-                type=heading.type,
-                payload_options=[
-                    PayloadOptionResponse(
-                        payload_id=heading.payload_id,
-                        order_by=str(opt.order_by) if opt.order_by is not None else None,
-                        name=opt.name,
-                        current_setting=opt.current_setting,
-                        required=opt.required,
-                        description=opt.description,
-                    )
-                    for opt in (heading.payload_options or [])
-                ]
-            )
-            for payload in (attack.payload_options or [])
-            for heading in (payload.payload_headings or [])
-        ],
-        targets=[
-            TargetResponse(
-                target_id=target.target_id,
-                id=target.id,
-                name=target.name,
-                default_setting=target.default_setting,
-                order_by=target.order_by
-            )
-            for target in (attack.targets or [])
-        ]
-    )
+#
+# @app.get("/attacks/{attack_id}")
+# def getOneAttack(
+#         attack_id,
+#         session: Session = Depends(get_session)
+#     ):
+#
+#     statement = (
+#         select(Attack)
+#         .where(Attack.attack_id == attack_id)
+#         .options(
+#             #selectinload(Attack.payloads
+#         selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options),
+#         selectinload(Attack.targets),
+#         selectinload(Attack.option_headings),
+#         )
+#     )
+#     result = session.exec(statement).first()
+#
+#     if not result:
+#         raise HTTPException(status_code=404, detail="Attack not found")
+#
+#     return result
+#
+# def build_attack_response(attack: Attack) -> AttackResponse:
+#     return AttackResponse(
+#         attack_id=attack.attack_id,
+#         name=attack.name,
+#         module=attack.module,
+#         platform=attack.platform,
+#         arch=attack.arch,
+#         privileged=attack.privileged,
+#         license=attack.license,
+#         rank=attack.rank,
+#         disclosed=attack.disclosed,
+#         provided_by=attack.provided_by,
+#         module_side_effects=attack.module_side_effects,
+#         module_stability=attack.module_stability,
+#         module_reliability=attack.module_reliability,
+#         check_supported=attack.check_supported,
+#         payload_information=attack.payload_information,
+#         description=attack.description,
+#         refs=attack.refs,
+#         type=attack.type,
+#         payload_default=attack.payload_default,
+#         option_headings=[
+#             ModuleOptionHeadingResponse(
+#                 attack_id=attack.attack_id,
+#                 order_by=option_heading.order_by,
+#                 name=option_heading.name,
+#                 title=option_heading.title,
+#                 type=option_heading.type
+#             )
+#             for option_heading in (attack.option_headings or [])
+#         ],
+#         payload_headings=[
+#             PayloadResponse(
+#                 payload_id=payload.payload_id,
+#                 attack_id=payload.attack_id,
+#                 order_by=payload.order_by,
+#                 rank=payload.rank,
+#                 description=payload.description,
+#                 payload=payload.payload,
+#                 check_supported=payload.check_supported,
+#                 compatible_payloads=[
+#                     PayloadOptionHeadingResponse(
+#                         payload_id=heading.payload_id,
+#                         order_by=str(heading.order_by) if heading.order_by is not None else None,
+#                         name=heading.name,
+#                         title=heading.title,
+#                         type=heading.type,
+#                         payload_options=[
+#                             PayloadOptionResponse(
+#                                 payload_id=heading.payload_id,
+#                                 order_by=str(opt.order_by) if opt.order_by is not None else None,
+#                                 name=opt.name,
+#                                 current_setting=opt.current_setting,
+#                                 required=opt.required,
+#                                 description=opt.description,
+#                             )
+#                             for opt in (heading.payload_options or [])
+#                         ]
+#                     )
+#                     for heading in (payload.payload_headings or [])
+#                 ]
+#
+#                 )
+#             for payload in (attack.payload_headings or [])
+#         ],
+#         targets=[
+#             TargetResponse(
+#                 target_id=target.target_id,
+#                 id=target.id,
+#                 name=target.name,
+#                 default_setting=target.default_setting,
+#                 order_by=target.order_by
+#             )
+#             for target in (attack.targets or [])
+#         ]
+#     )
 
 
 @app.get("/targets", status_code=200, response_model=List[TargetResponse])
@@ -254,14 +269,18 @@ def get_all_taargets(session: Session = Depends(get_session)) -> List[TargetResp
     )
     return session.exec(statement).all()
 
-@app.get("/payloads", status_code=200, response_model=list[PayloadResponse])
-def get_all_payloads(session: Session = Depends(get_session)) -> List[PayloadResponse]:
+@app.post("/payloads", status_code=200, response_model=list[PayloadResponse])
+def get_all_payloads(
+        attack_id,
+        session: Session = Depends(get_session)) -> List[PayloadResponse]:
     statement = (
         select(Payload)
+        .where(Payload.attack_id == attack_id)
         .options(
             selectinload(Payload.payload_headings),
             selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options)
         )
+        .limit(10)
     )
     return session.exec(statement).all()
 

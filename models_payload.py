@@ -1,11 +1,12 @@
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Relationship
 
-from models_attack import  AttackPayloadLink
+from models_attack import Attack
 
 class Payload(SQLModel, table=True):
     __tablename__ = "attacks_payload"
-    payload_id: Optional[int] = Field(default=None, primary_key=True)
+    attack_id: Optional[int] = Field(default=None, foreign_key="attacks_attack.attack_id", primary_key=True)
+    payload_id: Optional[int] #= Field(default=None, foreign_key="attacks_payload.payload_id", primary_key=True)
     order_by: Optional[str]
     payload: Optional[str]
     disclosure: Optional[str]
@@ -13,12 +14,9 @@ class Payload(SQLModel, table=True):
     description: Optional[str]
     check_supported: Optional[str]
 
-    payload_headings: List["PayloadOptionHeading"] = Relationship(back_populates="payload")
+    attack: Attack = Relationship(back_populates="payload_headings")
 
-    attacks: List["Attack"] = Relationship(
-        back_populates="payload_options",
-        link_model=AttackPayloadLink
-    )
+    payload_headings: List["PayloadOptionHeading"] = Relationship(back_populates="payload")
 
 
 class PayloadOptionHeading(SQLModel, table=True):
