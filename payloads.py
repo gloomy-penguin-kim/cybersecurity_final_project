@@ -5,12 +5,12 @@ import os
 import re
 import time
 
-msf_type = sys.argv[1]
+msf_type = "payloads" or sys.argv[1]
 base_path = sys.argv[2]
 dry_run = sys.argv[3]
 database = os.path.join(base_path, "database.db")
 
-if "exploits" != msf_type and "auxiliary" != msf_type and "post" != msf_type:
+if "exploits" != msf_type and "auxiliary" != msf_type and "post" != msf_type and "payloads" != msf_type:
     print("You need to specify exploits, auxiliary, or post")
     sys.exit(1)
 
@@ -53,22 +53,6 @@ def insert_data(table_name, data_array, returning_id):
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
-
-def update_descr(attack_id, payload_default):
-    try:
-
-        values = (payload_default, attack_id)
-        query = "update attacks_attack set payload_default = ? where attack_id = ?"
-
-        print(query)
-        print(values)
-
-        if (dry_run != "dry_run"):
-            cursor.execute(query, values)
-            sqliteConnection.commit()
-
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
 
 
 def find_nth(haystack: str, needle: str, n: int) -> int:
@@ -171,7 +155,7 @@ def payload_payload():
             after_title = False
             section_line_count = 0
             section_count = 0
-            section = {"attack_id": "", "title": ""}
+            section = {"payload_id": "", "title": ""}
             heading_start_pos = []
             options = options[2:]
             heading_line = ""
@@ -192,17 +176,17 @@ def payload_payload():
                             var_descr = " ".join(option_line.split(':')[1].split()[1:])
 
                             section_count += 1
-                            option_heading_id = insert_data('attacks_option_heading',
+                            option_heading_id = insert_data('attacks_payload_option_heading',
                                                             {"attack_id": payload_id,
                                                              "title": "Extra Things",
                                                              "order_by": section_count,
                                                              "type": "payload"},
-                                                            "option_heading_id")
-                            insert_data("attacks_option",
+                                                            "payload_option_heading_id")
+                            insert_data("attacks_payload_option",
                                         {"name": var_name,
                                          "current_setting": var_value,
                                          "description": var_descr},
-                                        "option_id")
+                                        "payload_option_id")
 
                             continue
                         section = {"attack_id": payload_id,
@@ -218,13 +202,13 @@ def payload_payload():
                             name = ""
                             if "(" in heading_line:
                                 name = heading_line[heading_line.index('(') + 1:len(heading_line) - 2]
-                            option_heading_id = insert_data('attacks_option_heading',
-                                                            {"attack_id": payload_id,
+                            option_heading_id = insert_data('attacks_payload_option_heading',
+                                                            {"payload_id": payload_id,
                                                              "title": heading_line,
                                                              "name": name,
                                                              "order_by": section_count,
                                                              "type": "Payload"},
-                                                            "option_heading_id")
+                                                            "payload_option_heading_id")
                         else:
                             break
 
@@ -265,19 +249,29 @@ def payload_payload():
                             i += 1
 
                         if section['title'] != "Exploit Target:":
-                            section_options['option_heading_id'] = option_heading_id
+                            section_options['payload_option_heading_id'] = option_heading_id
                             section_options['order_by'] = section_line_count - 4
-                            insert_data("attacks_option", section_options, "option_id")
+                            insert_data("attacks_payload_option", section_options, "payload_option_id")
 
                         # section["options"].append(section_options)
                         print(section_options)
                         # insert_data("attack_option",section_options)
 
                 if not after_title and option_line.strip() == "":
-                    section = {"attack_id": "", "title": ""}
+                    section = {"payload_id": "", "title": ""}
                     section_line_count = 0
                     option_heading_id = 0
                     heading_line = ""
 
 
 payload_payload()
+
+
+
+#
+#
+# create table if not exists attacks_payload_option_heading (payload_option_heading_id INTEGER PRIMARY KEY AUTOINCREMENT
+#                                                            , payload_id int,title text,name text,order_by text,type text);
+#
+# create table if not exists attacks_payload_option (payload_option_id INTEGER PRIMARY KEY AUTOINCREMENT,
+# Name text,Current_Setting text,Required text,Description text,payload_option_heading_id text, order_by text)
