@@ -376,7 +376,7 @@ if data:
     child.expect(['msf6'])
     lines = child.before.splitlines()
 
-    for row in data[]:
+    for row in data:
         name = row['name']
         #collection_attacks.insert_one(row)
         #row_number = insert_data("attacks_attack", row)
