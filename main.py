@@ -91,7 +91,7 @@ from models.attack import Attack #AttackPayloadLink
 from models.payload import Payload
 from models.options import ModuleOptionHeading, PayloadOptionHeading
 from models.target import Target
-from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingResponse, TargetResponse
+from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingResponse, TargetResponse, ModuleOptionResponse
 from typing import List
 
 
@@ -106,13 +106,93 @@ def read_attacks(
                                Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
 
 
-class AttackResponse2(SQLModel):
-    attack_id: int
-    module: str
-    module_options: List[ModuleOptionHeadingResponse]
-    payload_options: List[PayloadResponse]
+@app.post("/attacks")
+def get_multiple_attacks_for_attack(attackList: List[int],
+                                   session: Session = Depends(get_session)):
+    response = []
 
-@app.get("/attacks/{attack_id}/payload-options")
+    for attack_id in attackList:
+        attack = session.get(Attack, attack_id)
+        if not attack:
+            continue  # or collect error info if you want
+
+        payload_options = []
+
+        for payload_loop in attack.payloads:
+            for heading in payload_loop.payload_headings:
+                heading_options = []
+                for option in heading.payload_options:
+                    heading_options.append({
+                        "option_name": option.name,
+                        "option_value": option.current_setting,
+                        "option_required": option.required,
+                        "option_description": option.description,
+                        "option_order_by": option.order_by
+                    })
+
+                payload_options.append({
+                    "payload_id": heading.payload_id,
+                    "payload_name": heading.payload.payload,
+                    "payload_order_by": heading.order_by,
+                    "payload_options": heading_options
+                })
+
+        option_headings = []
+        for option_heading in attack.option_headings:
+            heading_options = []
+            for option in option_heading.module_options:
+                heading_options.append({
+                    "option_name": option.name,
+                    "option_value": option.current_setting,
+                    "option_required": option.required,
+                    "option_description": option.description,
+                    "option_order_by": option.order_by
+                })
+
+            option_headings.append({
+                "module_name": option_heading.name,
+                "module_title": option_heading.title,
+                "module_order_by": option_heading.order_by,
+                "module_options": heading_options
+            })
+        targets = []
+        for target in attack.targets:
+            targets.append({
+                "target_id": target.target_id,
+                "id": target.id,
+                "name": target.name,
+                "default_setting": target.default_setting,
+                "order_by": target.order_by
+            })
+
+        response.append({
+            "attack_id": attack_id,
+            "module": attack.module,
+            "name": attack.name,
+            "platform": attack.platform,
+            "arch": attack.arch,
+            "privileged": attack.privileged,
+            "license": attack.license,
+            "rank": attack.rank,
+            "disclosed": attack.disclosed,
+            "provided_by": attack.provided_by,
+            "module_side_effects": attack.module_side_effects,
+            "module_stability": attack.module_stability,
+            "module_reliability": attack.module_reliability,
+            "check_supported": attack.check_supported,
+            "payload_information": attack.payload_information,
+            "description": attack.description,
+            "refs": attack.refs,
+            "type": attack.type,
+            "payload_default": attack.payload_default,
+            "payload_options": payload_options,
+            "module_options": option_headings,
+            "target_options": targets
+        })
+
+    return response
+
+@app.get("/attacks/{attack_id}")
 def get_payload_options_for_attack(attack_id: int, session: Session = Depends(get_session)):
     # Get the attack
     attack = session.get(Attack, attack_id)
@@ -123,145 +203,191 @@ def get_payload_options_for_attack(attack_id: int, session: Session = Depends(ge
 
     for payload_loop in attack.payloads:
         for heading in payload_loop.payload_headings:
-            print("----------------------------------------------------")
-            print(payload_loop)
-            print("----------------------------------------------------")
-
             heading_options = []
             for option in heading.payload_options:
                 heading_options.append({
                     "option_name": option.name,
                     "option_value": option.current_setting,
                     "option_required": option.required,
-                    "option_description": option.description})
+                    "option_description": option.description,
+                    "option_order_by": option.order_by})
 
             payload_options.append({
                 "payload_id": heading.payload_id,
                 "payload_name": heading.payload.payload,
-                "options": heading_options
+                "payload_order_by": heading.order_by,
+                "payload_options": heading_options
             })
 
+    option_headings = []
+    for option_heading in attack.option_headings:
+        heading_options = []
+        for option in option_heading.module_options:
+            heading_options.append({
+                "option_name": option.name,
+                "option_value": option.current_setting,
+                "option_required": option.required,
+                "option_description": option.description,
+                "option_order_by": option.order_by})
 
-    return {"attack_id": attack_id, "payload_options": payload_options}
+        option_headings.append({
+            "module_name": option_heading.name,
+            "module_title": option_heading.title,
+            "module_order_by": option_heading.order_by,
+            "module_options": heading_options
+        })
+
+    targets = []
+    for target in attack.targets:
+        targets.append({
+            "target_id": target.target_id,
+            "id": target.id,
+            "name": target.name,
+            "default_setting": target.default_setting,
+            "order_by": target.order_by
+        })
+
+    return {"attack_id": attack_id,
+            "module": attack.module,
+            "name":attack.name,
+            "platform":attack.platform,
+            "arch":attack.arch,
+            "privileged":attack.privileged,
+            "license":attack.license,
+            "rank":attack.rank,
+            "disclosed":attack.disclosed,
+            "provided_by":attack.provided_by,
+            "module_side_effects":attack.module_side_effects,
+            "module_stability":attack.module_stability,
+            "module_reliability":attack.module_reliability,
+            "check_supported":attack.check_supported,
+            "payload_information":attack.payload_information,
+            "description":attack.description,
+            "refs":attack.refs,
+            "type":attack.type,
+            "payload_default":attack.payload_default,
+            "payload_options": payload_options,
+            "module_options": option_headings,
+            "target_options": targets }
 
 
-@app.post("/attacks", status_code=200)  # , response_model=List[AttackRead])
-def post_attacks(
-        attackList: List[int],
-        session: Session = Depends(get_session),
-):
-    statement = (
-        select(Attack)
-        .where(Attack.attack_id.in_(attackList))
-        .options(
-            selectinload(Attack.option_headings).selectinload(ModuleOptionHeading.module_options),
-            selectinload(Attack.payloads).selectinload(Payload.payload_headings).selectinload(
-                PayloadOptionHeading.payload_options)
-        )
-    )
-    attacks = session.exec(statement).all()
-
-    attack_responses = []
-
-    for attack in attacks:
-        # Module options
-        module_options = []
-        for heading in attack.option_headings:
-            options = [
-                ModuleOptionResponse(
-                    name=o.name,
-                    current_setting=o.current_setting,
-                    description=o.description,
-                    required=o.required,
-                    order_by=o.order_by,
-                )
-                for o in heading.module_options
-            ]
-            module_options.append(
-                ModuleOptionHeadingResponse(
-                    title=heading.title,
-                    name=heading.name,
-                    module_options=options,
-                    order_by=heading.order_by,
-                    attack_id=attack.attack_id,
-                )
-            )
-
-        # Payloads and their headings/options
-        payload_options = []
-        # print("_--------------------------------------------------------------")
-        # print(attack.payloads)
-        # print("_--------------------------------------------------------------")
-        for payload in attack.payloads:
-            heading_list = []
-            for heading in payload.payload_headings:
-                option_list = [
-                    PayloadOptionResponse(
-                        name=o.name,
-                        current_setting=o.current_setting,
-                        description=o.description,
-                        required=o.required,
-                        order_by=o.order_by,
-                    )
-                    for o in heading.payload_options
-                ]
-                heading_list.append(
-                    PayloadOptionHeadingResponse(
-                        payload_id=payload.payload_id,
-                        order_by=str(heading.order_by),
-                        name=heading.name,
-                        title=heading.title,
-                        type=heading.type,
-                        payload_options=option_list
-                    )
-                )
-
-            print("_--------------------------------------------------------------")
-            print(heading_list)
-            print("_--------------------------------------------------------------")
-            payload_options.append(
-                PayloadResponse(
-                    payload_id=payload.payload_id,
-                    order_by=payload.order_by,
-                    payload=payload.payload,
-                    disclosure=payload.disclosure,
-                    rank=payload.rank,
-                    description=payload.description,
-                    check_supported=payload.check_supported,
-                    payload_headings=heading_list
-                )
-            )
-
-        attack_responses.append(
-            AttackResponse(
-                attack_id=attack.attack_id,
-                module=attack.module,
-                name=attack.name,
-                platform=attack.platform,
-                arch=attack.arch,
-                privileged=attack.privileged,
-                license=attack.license,
-                rank=attack.rank,
-                disclosed=attack.disclosed,
-                provided_by=attack.provided_by,
-                module_side_effects=attack.module_side_effects,
-                module_stability=attack.module_stability,
-                module_reliability=attack.module_reliability,
-                check_supported=attack.check_supported,
-                payload_information=attack.payload_information,
-                description=attack.description,
-                refs=attack.refs,
-                type=attack.type,
-                payload_default=attack.payload_default,
-                module_options=module_options,
-                payload_options=payload_options,
-            )
-        )
-    print("_--------------------------------------------------------------")
-    print(attack_responses)
-    print("_--------------------------------------------------------------")
-
-    return attack_responses
+# @app.post("/attacks", status_code=200)  # , response_model=List[AttackRead])
+# def post_attacks(
+#         attackList: List[int],
+#         session: Session = Depends(get_session),
+# ):
+#     statement = (
+#         select(Attack)
+#         .where(Attack.attack_id.in_(attackList))
+#         .options(
+#             selectinload(Attack.option_headings).selectinload(ModuleOptionHeading.module_options),
+#             selectinload(Attack.payloads).selectinload(Payload.payload_headings).selectinload(
+#                 PayloadOptionHeading.payload_options)
+#         )
+#     )
+#     attacks = session.exec(statement).all()
+#
+#     attack_responses = []
+#
+#     for attack in attacks:
+#         # Module options
+#         module_options = []
+#         for heading in attack.option_headings:
+#             options = [
+#                 ModuleOptionResponse(
+#                     name=o.name,
+#                     current_setting=o.current_setting,
+#                     description=o.description,
+#                     required=o.required,
+#                     order_by=o.order_by,
+#                 )
+#                 for o in heading.module_options
+#             ]
+#             module_options.append(
+#                 ModuleOptionHeadingResponse(
+#                     title=heading.title,
+#                     name=heading.name,
+#                     module_options=options,
+#                     order_by=heading.order_by,
+#                     attack_id=attack.attack_id,
+#                 )
+#             )
+#
+#         # Payloads and their headings/options
+#         payload_options = []
+#         # print("_--------------------------------------------------------------")
+#         # print(attack.payloads)
+#         # print("_--------------------------------------------------------------")
+#         for payload in attack.payloads:
+#             heading_list = []
+#             for heading in payload.payload_headings:
+#                 option_list = [
+#                     PayloadOptionResponse(
+#                         name=o.name,
+#                         current_setting=o.current_setting,
+#                         description=o.description,
+#                         required=o.required,
+#                         order_by=o.order_by,
+#                     )
+#                     for o in heading.payload_options
+#                 ]
+#                 heading_list.append(
+#                     PayloadOptionHeadingResponse(
+#                         payload_id=payload.payload_id,
+#                         order_by=str(heading.order_by),
+#                         name=heading.name,
+#                         title=heading.title,
+#                         type=heading.type,
+#                         payload_options=option_list
+#                     )
+#                 )
+#
+#             print("_--------------------------------------------------------------")
+#             print(heading_list)
+#             print("_--------------------------------------------------------------")
+#             payload_options.append(
+#                 PayloadResponse(
+#                     payload_id=payload.payload_id,
+#                     order_by=payload.order_by,
+#                     payload=payload.payload,
+#                     disclosure=payload.disclosure,
+#                     rank=payload.rank,
+#                     description=payload.description,
+#                     check_supported=payload.check_supported,
+#                     payload_headings=heading_list
+#                 )
+#             )
+#
+#         attack_responses.append(
+#             AttackResponse(
+#                 attack_id=attack.attack_id,
+#                 module=attack.module,
+#                 name=attack.name,
+#                 platform=attack.platform,
+#                 arch=attack.arch,
+#                 privileged=attack.privileged,
+#                 license=attack.license,
+#                 rank=attack.rank,
+#                 disclosed=attack.disclosed,
+#                 provided_by=attack.provided_by,
+#                 module_side_effects=attack.module_side_effects,
+#                 module_stability=attack.module_stability,
+#                 module_reliability=attack.module_reliability,
+#                 check_supported=attack.check_supported,
+#                 payload_information=attack.payload_information,
+#                 description=attack.description,
+#                 refs=attack.refs,
+#                 type=attack.type,
+#                 payload_default=attack.payload_default,
+#                 module_options=module_options,
+#                 payload_options=payload_options,
+#             )
+#         )
+#     print("_--------------------------------------------------------------")
+#     print(attack_responses)
+#     print("_--------------------------------------------------------------")
+#
+#     return attack_responses
 
 
 #
@@ -463,99 +589,114 @@ def get_all_options(
     #     for payload in payloads
     # ]
 
-#
-# #
-# # @app.post("/run", status_code=200)
-# # def read_attacks(
-# #         attacks: List[AttackRequest],
-# #         session: SessionDep):
-# #     results = []
-# #     print(len(attacks))
-# #     print(attacks)
-# #     for attack in attacks:
-# #         filename = attack.name.replace(" ","_")+"_"+str(round(time.time() * 1000))+".rc"
-# #         with open(filename, "w") as file:
-# #             file.write("use " + attack.module +"\n")
-# #             for option_heading in attack.option_headings:
-# #                 for option in option_heading.options:
-# #                     if option.current_setting != "":
-# #                         file.write("set " + option.name + " " + option.current_setting + "\n")
-# #             for option  in attack.extras:
-# #                 if option.value != "":
-# #                     file.write("set " + option.name + " " + option.value + "\n")
-# #             if attack.target != "": file.write("set target " + str(attack.target) + "\n")
-# #             if attack.payload != "":
-# #                 file.write("set payload " + str(attack.payload) + "\n")
-# #             if attack.check == "run": file.write("exploit\n")
-# #             if attack.check == "check": file.write("check\n")
-# #
-# #         file_contents = []
-# #         with open(filename, "r") as file:
-# #             file_contents = file.readlines()
-# #             for line in file_contents:
-# #                 print(line)
-# #         lines = []
-# #
-# #         try:
-# #             child = pexpect.spawn("msfconsole -r " + filename)
-# #             child.expect(pexpect.TIMEOUT, timeout=5)
-# #             child.expect("Metasploit Documentation.*")
-# #             print(child.after)
-# #             child.expect("msf6.*")
-# #             for line in child.before.splitlines():
-# #                 line = line.decode('utf-8')
-# #                 line = re.sub(r'\x1b\[[0-9;]*m', '', line)
-# #                 lines.append(line)
-# #
-# #             results.append({ 'attack_id': attack.attack_id,
-# #                              'module': attack.module,
-# #                              'response': lines
-# #                             })
-# #             print(child.before.splitlines())
-# #             # print(child.after.splitlines()
-# #             child.send("exit")
-# #             child.sendline("exit")
-# #             child.close()
-# #         except:
-# #             results.append({ 'attack_id': attack.attack_id,
-# #                              'module': attack.module,
-# #                              'response': lines
-# #                             })
-# #
-# #         if os.path.exists(filename):
-# #             os.remove(filename)
-# #             print(f"File '{filename}' deleted successfully.")
-# #         else:
-# #             print(f"File '{filename}' does not exist.")
-# #
-# #
-# #     return results
-# #
-# #
-# #
-# #
-# #     # child.expect(['msf6 >'])
-# #     # # lines = child.after.splitlines()
-# #     # child.sendLine('use ' + attack.module)
-# #     # child.expect('msf6 >')
-# #     # # lines = child.after.splitlines()
-# #     #
-# #     # for line in lines:
-# #     #     print(line)
-# #     # # lines = []
-# #     # child.sendline('info ' + attack.module)
-# #     # child.expect(['^msf6*'])
-# #
-# #     # r = { "before": child.before.splitlines(), "after": child.after.splitlines()}
-# #
-# #     # # # while 'msf6 ' not in lines[0].decode('utf-8'):
-# #     # # #     child.expect('msf6 *')
-# #     # # #     lines = child.before.splitlines()
-# #
-# #     # child.sendLine('exit')
-# #     # lines = child.after.splitlines()
-# #     # #child.expect(['^msf6*'])
-# #     # child.close()
-#
-#
-#
+
+import time
+import pexpect
+import os
+import re
+from pydantic import BaseModel
+class AttackSubmission(BaseModel):
+    attack_id: int
+    attack_module: str
+    attack_name: str
+    RCinfo: str
+@app.post("/run_single_attack", status_code=200, response_model=None)
+def read_attacks(
+        attacks: List[AttackSubmission],
+        session: SessionDep):
+    results = []
+    print(attacks)
+
+
+    for attack in attacks:
+        filename = os.path.join('to_be_removed', attack.attack_name.replace(" ","_")+"_"+str(round(time.time() * 1000))+".rc")
+        with open(filename, "w") as file:
+            file.write(attack.RCinfo)
+        #     file.write("use " + attack.module +"\n")
+        #     for option_heading in attack.option_headings:
+        #         for option in option_heading.options:
+        #             if option.current_setting != "":
+        #                 file.write("set " + option.name + " " + option.current_setting + "\n")
+        #     for option  in attack.extras:
+        #         if option.value != "":
+        #             file.write("set " + option.name + " " + option.value + "\n")
+        #     if attack.target != "": file.write("set target " + str(attack.target) + "\n")
+        #     if attack.payload != "":
+        #         file.write("set payload " + str(attack.payload) + "\n")
+        #     if attack.check == "run": file.write("exploit\n")
+        #     if attack.check == "check": file.write("check\n")
+
+        file_contents = []
+        with open(filename, "r") as file:
+            file_contents = file.readlines()
+            for line in file_contents:
+                print(line)
+        lines = []
+
+        try:
+            child = pexpect.spawn("msfconsole -r " + filename)
+            child.expect(pexpect.TIMEOUT, timeout=20)
+            child.expect("Metasploit Documentation.*")
+            print("child after..............................................................")
+            print(child.after)
+            print("child before..............................................................")
+            print(child.before)
+            child.expect("msf6.*")
+            print("child before..............................................................")
+            print(child.before)
+            for line in child.before.splitlines():
+                line = line.decode('utf-8')
+                line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+                lines.append(line)
+
+            results.append({ 'attack_id': attack.attack_id,
+                             'module': attack.module,
+                             'response': lines
+                            })
+            print(child.before.splitlines())
+            # print(child.after.splitlines()
+            child.send("exit")
+            child.sendline("exit")
+            child.close()
+        except:
+            results.append({ 'attack_id': attack.attack_id,
+                             'module': attack.attack_module,
+                             'response': lines
+                            })
+
+        if os.path.exists(filename):
+            os.remove(filename)
+            print(f"File '{filename}' deleted successfully.")
+        else:
+            print(f"File '{filename}' does not exist.")
+
+
+    return results
+
+
+
+
+    # child.expect(['msf6 >'])
+    # # lines = child.after.splitlines()
+    # child.sendLine('use ' + attack.module)
+    # child.expect('msf6 >')
+    # # lines = child.after.splitlines()
+    #
+    # for line in lines:
+    #     print(line)
+    # # lines = []
+    # child.sendline('info ' + attack.module)
+    # child.expect(['^msf6*'])
+
+    # r = { "before": child.before.splitlines(), "after": child.after.splitlines()}
+
+    # # # while 'msf6 ' not in lines[0].decode('utf-8'):
+    # # #     child.expect('msf6 *')
+    # # #     lines = child.before.splitlines()
+
+    # child.sendLine('exit')
+    # lines = child.after.splitlines()
+    # #child.expect(['^msf6*'])
+    # child.close()
+
+

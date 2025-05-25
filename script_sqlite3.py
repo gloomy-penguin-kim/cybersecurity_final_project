@@ -26,7 +26,6 @@ def clean_line(line):
 sqliteConnection = sqlite3.connect(database)
 cursor = sqliteConnection.cursor()
 
-cursor.execute("delete from attacks_attack_payload", {})
 sqliteConnection.commit()
 
 
@@ -364,7 +363,7 @@ def payloads_n_stuff(module, attack_id):
             insert_data('attacks_attack_payload', row, "attack_payload_id")
 
 
-data = [{"name": "exploit/aix/local/ibstat_path"}]
+#data = [{"name": "exploit/aix/local/ibstat_path"}]
 if data:
 
     with open(info_filename, 'w') as file:
@@ -377,7 +376,7 @@ if data:
     child.expect(['msf6'])
     lines = child.before.splitlines()
 
-    for row in data:
+    for row in data[]:
         name = row['name']
         #collection_attacks.insert_one(row)
         #row_number = insert_data("attacks_attack", row)
