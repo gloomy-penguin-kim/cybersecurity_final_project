@@ -1,33 +1,21 @@
-from typing import Annotated, List, Optional
-from sqlalchemy.orm import load_only
-
+from typing import Annotated
 
 import logging
 
-from fastapi import Depends, FastAPI, Query
-from sqlmodel import Field, Relationship, Session, SQLModel, create_engine, select, join
-
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI
+from sqlmodel import Session, SQLModel, create_engine
 
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
 from fastapi.staticfiles import StaticFiles
 
-import pexpect
-import time
-import os
-import string
-import re
-
-from models_response import AttackResponse
-
 # Setup logging
 logger = logging.getLogger("uvicorn.error")
 
 # --- Models ---
 
-#from full_models import Attack, AttackSimple # Payload, PayloadOptionHeading
+# from full_models import Attack, AttackSimple # Payload, PayloadOptionHeading
 
 # --- Database setup ---
 
@@ -37,12 +25,15 @@ sqlite_url = f"sqlite:///{sqlite_file_name}"
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
 
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+
 
 def get_session():
     with Session(engine) as session:
         yield session
+
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -66,8 +57,6 @@ middleware = [
     )
 ]
 
-
-
 app = FastAPI(middleware=middleware)
 
 app.add_middleware(
@@ -79,11 +68,10 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
- 
+
 from sqlalchemy.orm import selectinload
 
-
-PAGE_SIZE = 50 
+PAGE_SIZE = 50
 
 # AttackRead
 # from models_attack import Attack, AttackSimple
@@ -97,67 +85,183 @@ PAGE_SIZE = 50
 #                                 Attack.rank, Attack.disclosed,
 #                                 Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
 
-
-from sqlmodel import col
-
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select, col, Session
-from sqlalchemy.orm import selectinload
+from fastapi import Depends, HTTPException
+from sqlmodel import select, Session
+from models.attack import Attack #AttackPayloadLink
+from models.payload import Payload
+from models.options import ModuleOptionHeading, PayloadOptionHeading
+from models.target import Target
+from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingResponse, TargetResponse
 from typing import List
 
-from fastapi import APIRouter, Depends
-from sqlmodel import Session, select
-from typing import List
-
-from models_payload import (
-    PayloadOptionHeading, PayloadOption,
-    PayloadResponse, PayloadOptionHeadingResponse, PayloadOptionResponse
-)
-from models_options import (
-    ModuleOptionHeading,
-    ModuleOptionHeadingResponse, ModuleOptionResponse
-)
-from models_target import (
-    Target, TargetResponse
-)
-from models_attack import (
-    Attack, AttackSimple
-)
-from models_response import (
-    AttackResponse
-)
-# from models_attack_payload import (
-#     AttackPayload, AttackPayloadResponse
-# )
 
 @app.get("/attacks", response_model=List[AttackSimple])
 def read_attacks(
-    session: Session = Depends(get_session),
-    offset: int = 0,
-    limit: int = 100,
+        session: Session = Depends(get_session),
+        offset: int = 0,
+        limit: int = 100,
 ) -> List[AttackSimple]:
     return session.exec(select(Attack.attack_id, Attack.name, Attack.module,
-                                Attack.rank, Attack.disclosed,
-                                Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
+                               Attack.rank, Attack.disclosed,
+                               Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
 
 
-@app.post("/attacks", status_code=200) # , response_model=List[AttackRead])
+class AttackResponse2(SQLModel):
+    attack_id: int
+    module: str
+    module_options: List[ModuleOptionHeadingResponse]
+    payload_options: List[PayloadResponse]
+
+@app.get("/attacks/{attack_id}/payload-options")
+def get_payload_options_for_attack(attack_id: int, session: Session = Depends(get_session)):
+    # Get the attack
+    attack = session.get(Attack, attack_id)
+    if not attack:
+        raise HTTPException(status_code=404, detail="Attack not found")
+
+    payload_options = []
+
+    for payload_loop in attack.payloads:
+        for heading in payload_loop.payload_headings:
+            print("----------------------------------------------------")
+            print(payload_loop)
+            print("----------------------------------------------------")
+
+            heading_options = []
+            for option in heading.payload_options:
+                heading_options.append({
+                    "option_name": option.name,
+                    "option_value": option.current_setting,
+                    "option_required": option.required,
+                    "option_description": option.description})
+
+            payload_options.append({
+                "payload_id": heading.payload_id,
+                "payload_name": heading.payload.payload,
+                "options": heading_options
+            })
+
+
+    return {"attack_id": attack_id, "payload_options": payload_options}
+
+
+@app.post("/attacks", status_code=200)  # , response_model=List[AttackRead])
 def post_attacks(
-    attackList: List[int],
-    session: Session = Depends(get_session),
+        attackList: List[int],
+        session: Session = Depends(get_session),
 ):
     statement = (
         select(Attack)
         .where(Attack.attack_id.in_(attackList))
-        # .options(
-        #     selectinload(Attack.payloads)
-        #     .selectinload(Payload.payload_headings)
-        # )
+        .options(
+            selectinload(Attack.option_headings).selectinload(ModuleOptionHeading.module_options),
+            selectinload(Attack.payloads).selectinload(Payload.payload_headings).selectinload(
+                PayloadOptionHeading.payload_options)
+        )
     )
-    results = session.exec(statement).all()
-    return results
+    attacks = session.exec(statement).all()
 
+    attack_responses = []
 
+    for attack in attacks:
+        # Module options
+        module_options = []
+        for heading in attack.option_headings:
+            options = [
+                ModuleOptionResponse(
+                    name=o.name,
+                    current_setting=o.current_setting,
+                    description=o.description,
+                    required=o.required,
+                    order_by=o.order_by,
+                )
+                for o in heading.module_options
+            ]
+            module_options.append(
+                ModuleOptionHeadingResponse(
+                    title=heading.title,
+                    name=heading.name,
+                    module_options=options,
+                    order_by=heading.order_by,
+                    attack_id=attack.attack_id,
+                )
+            )
+
+        # Payloads and their headings/options
+        payload_options = []
+        # print("_--------------------------------------------------------------")
+        # print(attack.payloads)
+        # print("_--------------------------------------------------------------")
+        for payload in attack.payloads:
+            heading_list = []
+            for heading in payload.payload_headings:
+                option_list = [
+                    PayloadOptionResponse(
+                        name=o.name,
+                        current_setting=o.current_setting,
+                        description=o.description,
+                        required=o.required,
+                        order_by=o.order_by,
+                    )
+                    for o in heading.payload_options
+                ]
+                heading_list.append(
+                    PayloadOptionHeadingResponse(
+                        payload_id=payload.payload_id,
+                        order_by=str(heading.order_by),
+                        name=heading.name,
+                        title=heading.title,
+                        type=heading.type,
+                        payload_options=option_list
+                    )
+                )
+
+            print("_--------------------------------------------------------------")
+            print(heading_list)
+            print("_--------------------------------------------------------------")
+            payload_options.append(
+                PayloadResponse(
+                    payload_id=payload.payload_id,
+                    order_by=payload.order_by,
+                    payload=payload.payload,
+                    disclosure=payload.disclosure,
+                    rank=payload.rank,
+                    description=payload.description,
+                    check_supported=payload.check_supported,
+                    payload_headings=heading_list
+                )
+            )
+
+        attack_responses.append(
+            AttackResponse(
+                attack_id=attack.attack_id,
+                module=attack.module,
+                name=attack.name,
+                platform=attack.platform,
+                arch=attack.arch,
+                privileged=attack.privileged,
+                license=attack.license,
+                rank=attack.rank,
+                disclosed=attack.disclosed,
+                provided_by=attack.provided_by,
+                module_side_effects=attack.module_side_effects,
+                module_stability=attack.module_stability,
+                module_reliability=attack.module_reliability,
+                check_supported=attack.check_supported,
+                payload_information=attack.payload_information,
+                description=attack.description,
+                refs=attack.refs,
+                type=attack.type,
+                payload_default=attack.payload_default,
+                module_options=module_options,
+                payload_options=payload_options,
+            )
+        )
+    print("_--------------------------------------------------------------")
+    print(attack_responses)
+    print("_--------------------------------------------------------------")
+
+    return attack_responses
 
 
 #
@@ -269,13 +373,14 @@ def get_all_taargets(session: Session = Depends(get_session)) -> List[TargetResp
     )
     return session.exec(statement).all()
 
-@app.post("/payloads", status_code=200, response_model=list[PayloadResponse])
+
+
+
+@app.get("/payloads", status_code=200, response_model=list[PayloadResponse])
 def get_all_payloads(
-        attack_id,
         session: Session = Depends(get_session)) -> List[PayloadResponse]:
     statement = (
         select(Payload)
-        .where(Payload.attack_id == attack_id)
         .options(
             selectinload(Payload.payload_headings),
             selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options)
@@ -283,6 +388,22 @@ def get_all_payloads(
         .limit(10)
     )
     return session.exec(statement).all()
+
+
+@app.post("/payloads/{attack_id}", status_code=200, response_model=list[PayloadResponse])
+def get_all_payloads(
+        attakc_id,
+        session: Session = Depends(get_session)) -> List[PayloadResponse]:
+    statement = (
+        select(Payload)
+        .options(
+            selectinload(Payload.payload_headings),
+            selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options)
+        )
+        .limit(10)
+    )
+    return session.exec(statement).all()
+
 
 @app.get("/options", status_code=200, response_model=list[ModuleOptionHeadingResponse])
 def get_all_options(session: Session = Depends(get_session)) -> List[PayloadResponse]:
@@ -295,14 +416,18 @@ def get_all_options(session: Session = Depends(get_session)) -> List[PayloadResp
     return session.exec(statement).all()
 
 
-
-
-
-
-
-
-
-
+@app.post("/options/{attack_id}", status_code=200, response_model=list[ModuleOptionHeadingResponse])
+def get_all_options(
+        attack_id,
+        session: Session = Depends(get_session)) -> List[PayloadResponse]:
+    statement = (
+        select(ModuleOptionHeading)
+        .where(ModuleOptionHeading.attack_id == attack_id)
+        .options(
+            selectinload(ModuleOptionHeading.module_options)
+        )
+    )
+    return session.exec(statement).all()
 
     # return [
     #     PayloadResponse(
@@ -337,9 +462,6 @@ def get_all_options(session: Session = Depends(get_session)) -> List[PayloadResp
     #     )
     #     for payload in payloads
     # ]
-
-
-
 
 #
 # #

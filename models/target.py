@@ -1,7 +1,7 @@
-from typing import List, Optional
+from typing import Optional
 from sqlmodel import SQLModel, Field, Relationship
 
-from models_attack import Attack
+from .attack import Attack
 
 class Target(SQLModel, table=True):
     __tablename__ = "attacks_target"
@@ -15,10 +15,3 @@ class Target(SQLModel, table=True):
     attack_id: Optional[int] = Field(default=None, foreign_key="attacks_attack.attack_id")
     attack: Optional[Attack] = Relationship(back_populates="targets")
 
-
-class TargetResponse(SQLModel):
-    target_id: int
-    id: int
-    name: str
-    default_setting: str
-    order_by: int

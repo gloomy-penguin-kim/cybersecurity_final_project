@@ -1,20 +1,16 @@
-from typing import List, Optional
+
+# models/attack.py
+from typing import List, Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from .link_tables import AttackPayloadLink
 
-
-class AttackSimple(SQLModel, table=True):
-    attack_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    module: str
-    rank: Optional[str]
-    disclosed: Optional[str]
-    check_supported: Optional[str]
-    type: Optional[str]
-
+if TYPE_CHECKING:
+    from .payload import Payload
+    from .options import ModuleOptionHeading
+    from .target import Target
 
 class Attack(SQLModel, table=True):
     __tablename__ = "attacks_attack"
-
     attack_id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     module: str
@@ -34,6 +30,7 @@ class Attack(SQLModel, table=True):
     refs: Optional[str]
     type: Optional[str]
     payload_default: Optional[str]
-    option_headings: Optional[List["ModuleOptionHeading"]] = Relationship(back_populates="attack")
-    payload_headings: Optional[List["Payload"]] = Relationship(back_populates="attack")
-    targets: Optional[List["Target"]] = Relationship(back_populates="attack")
+
+    option_headings: List["ModuleOptionHeading"] = Relationship(back_populates="attack")
+    targets: List["Target"] = Relationship(back_populates="attack")
+    payloads: List["Payload"] = Relationship(back_populates="attacks", link_model=AttackPayloadLink)
