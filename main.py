@@ -87,11 +87,12 @@ PAGE_SIZE = 50
 
 from fastapi import Depends, HTTPException
 from sqlmodel import select, Session
-from models.attack import Attack #AttackPayloadLink
+from models.attack import Attack  # AttackPayloadLink
 from models.payload import Payload
 from models.options import ModuleOptionHeading, PayloadOptionHeading
 from models.target import Target
-from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingResponse, TargetResponse, ModuleOptionResponse
+from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingResponse, TargetResponse, \
+    ModuleOptionResponse
 from typing import List
 
 
@@ -108,7 +109,7 @@ def read_attacks(
 
 @app.post("/attacks")
 def get_multiple_attacks_for_attack(attackList: List[int],
-                                   session: Session = Depends(get_session)):
+                                    session: Session = Depends(get_session)):
     response = []
 
     for attack_id in attackList:
@@ -192,6 +193,7 @@ def get_multiple_attacks_for_attack(attackList: List[int],
 
     return response
 
+
 @app.get("/attacks/{attack_id}")
 def get_payload_options_for_attack(attack_id: int, session: Session = Depends(get_session)):
     # Get the attack
@@ -249,247 +251,26 @@ def get_payload_options_for_attack(attack_id: int, session: Session = Depends(ge
 
     return {"attack_id": attack_id,
             "module": attack.module,
-            "name":attack.name,
-            "platform":attack.platform,
-            "arch":attack.arch,
-            "privileged":attack.privileged,
-            "license":attack.license,
-            "rank":attack.rank,
-            "disclosed":attack.disclosed,
-            "provided_by":attack.provided_by,
-            "module_side_effects":attack.module_side_effects,
-            "module_stability":attack.module_stability,
-            "module_reliability":attack.module_reliability,
-            "check_supported":attack.check_supported,
-            "payload_information":attack.payload_information,
-            "description":attack.description,
-            "refs":attack.refs,
-            "type":attack.type,
-            "payload_default":attack.payload_default,
+            "name": attack.name,
+            "platform": attack.platform,
+            "arch": attack.arch,
+            "privileged": attack.privileged,
+            "license": attack.license,
+            "rank": attack.rank,
+            "disclosed": attack.disclosed,
+            "provided_by": attack.provided_by,
+            "module_side_effects": attack.module_side_effects,
+            "module_stability": attack.module_stability,
+            "module_reliability": attack.module_reliability,
+            "check_supported": attack.check_supported,
+            "payload_information": attack.payload_information,
+            "description": attack.description,
+            "refs": attack.refs,
+            "type": attack.type,
+            "payload_default": attack.payload_default,
             "payload_options": payload_options,
             "module_options": option_headings,
-            "target_options": targets }
-
-
-# @app.post("/attacks", status_code=200)  # , response_model=List[AttackRead])
-# def post_attacks(
-#         attackList: List[int],
-#         session: Session = Depends(get_session),
-# ):
-#     statement = (
-#         select(Attack)
-#         .where(Attack.attack_id.in_(attackList))
-#         .options(
-#             selectinload(Attack.option_headings).selectinload(ModuleOptionHeading.module_options),
-#             selectinload(Attack.payloads).selectinload(Payload.payload_headings).selectinload(
-#                 PayloadOptionHeading.payload_options)
-#         )
-#     )
-#     attacks = session.exec(statement).all()
-#
-#     attack_responses = []
-#
-#     for attack in attacks:
-#         # Module options
-#         module_options = []
-#         for heading in attack.option_headings:
-#             options = [
-#                 ModuleOptionResponse(
-#                     name=o.name,
-#                     current_setting=o.current_setting,
-#                     description=o.description,
-#                     required=o.required,
-#                     order_by=o.order_by,
-#                 )
-#                 for o in heading.module_options
-#             ]
-#             module_options.append(
-#                 ModuleOptionHeadingResponse(
-#                     title=heading.title,
-#                     name=heading.name,
-#                     module_options=options,
-#                     order_by=heading.order_by,
-#                     attack_id=attack.attack_id,
-#                 )
-#             )
-#
-#         # Payloads and their headings/options
-#         payload_options = []
-#         # print("_--------------------------------------------------------------")
-#         # print(attack.payloads)
-#         # print("_--------------------------------------------------------------")
-#         for payload in attack.payloads:
-#             heading_list = []
-#             for heading in payload.payload_headings:
-#                 option_list = [
-#                     PayloadOptionResponse(
-#                         name=o.name,
-#                         current_setting=o.current_setting,
-#                         description=o.description,
-#                         required=o.required,
-#                         order_by=o.order_by,
-#                     )
-#                     for o in heading.payload_options
-#                 ]
-#                 heading_list.append(
-#                     PayloadOptionHeadingResponse(
-#                         payload_id=payload.payload_id,
-#                         order_by=str(heading.order_by),
-#                         name=heading.name,
-#                         title=heading.title,
-#                         type=heading.type,
-#                         payload_options=option_list
-#                     )
-#                 )
-#
-#             print("_--------------------------------------------------------------")
-#             print(heading_list)
-#             print("_--------------------------------------------------------------")
-#             payload_options.append(
-#                 PayloadResponse(
-#                     payload_id=payload.payload_id,
-#                     order_by=payload.order_by,
-#                     payload=payload.payload,
-#                     disclosure=payload.disclosure,
-#                     rank=payload.rank,
-#                     description=payload.description,
-#                     check_supported=payload.check_supported,
-#                     payload_headings=heading_list
-#                 )
-#             )
-#
-#         attack_responses.append(
-#             AttackResponse(
-#                 attack_id=attack.attack_id,
-#                 module=attack.module,
-#                 name=attack.name,
-#                 platform=attack.platform,
-#                 arch=attack.arch,
-#                 privileged=attack.privileged,
-#                 license=attack.license,
-#                 rank=attack.rank,
-#                 disclosed=attack.disclosed,
-#                 provided_by=attack.provided_by,
-#                 module_side_effects=attack.module_side_effects,
-#                 module_stability=attack.module_stability,
-#                 module_reliability=attack.module_reliability,
-#                 check_supported=attack.check_supported,
-#                 payload_information=attack.payload_information,
-#                 description=attack.description,
-#                 refs=attack.refs,
-#                 type=attack.type,
-#                 payload_default=attack.payload_default,
-#                 module_options=module_options,
-#                 payload_options=payload_options,
-#             )
-#         )
-#     print("_--------------------------------------------------------------")
-#     print(attack_responses)
-#     print("_--------------------------------------------------------------")
-#
-#     return attack_responses
-
-
-#
-# @app.get("/attacks/{attack_id}")
-# def getOneAttack(
-#         attack_id,
-#         session: Session = Depends(get_session)
-#     ):
-#
-#     statement = (
-#         select(Attack)
-#         .where(Attack.attack_id == attack_id)
-#         .options(
-#             #selectinload(Attack.payloads
-#         selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options),
-#         selectinload(Attack.targets),
-#         selectinload(Attack.option_headings),
-#         )
-#     )
-#     result = session.exec(statement).first()
-#
-#     if not result:
-#         raise HTTPException(status_code=404, detail="Attack not found")
-#
-#     return result
-#
-# def build_attack_response(attack: Attack) -> AttackResponse:
-#     return AttackResponse(
-#         attack_id=attack.attack_id,
-#         name=attack.name,
-#         module=attack.module,
-#         platform=attack.platform,
-#         arch=attack.arch,
-#         privileged=attack.privileged,
-#         license=attack.license,
-#         rank=attack.rank,
-#         disclosed=attack.disclosed,
-#         provided_by=attack.provided_by,
-#         module_side_effects=attack.module_side_effects,
-#         module_stability=attack.module_stability,
-#         module_reliability=attack.module_reliability,
-#         check_supported=attack.check_supported,
-#         payload_information=attack.payload_information,
-#         description=attack.description,
-#         refs=attack.refs,
-#         type=attack.type,
-#         payload_default=attack.payload_default,
-#         option_headings=[
-#             ModuleOptionHeadingResponse(
-#                 attack_id=attack.attack_id,
-#                 order_by=option_heading.order_by,
-#                 name=option_heading.name,
-#                 title=option_heading.title,
-#                 type=option_heading.type
-#             )
-#             for option_heading in (attack.option_headings or [])
-#         ],
-#         payload_headings=[
-#             PayloadResponse(
-#                 payload_id=payload.payload_id,
-#                 attack_id=payload.attack_id,
-#                 order_by=payload.order_by,
-#                 rank=payload.rank,
-#                 description=payload.description,
-#                 payload=payload.payload,
-#                 check_supported=payload.check_supported,
-#                 compatible_payloads=[
-#                     PayloadOptionHeadingResponse(
-#                         payload_id=heading.payload_id,
-#                         order_by=str(heading.order_by) if heading.order_by is not None else None,
-#                         name=heading.name,
-#                         title=heading.title,
-#                         type=heading.type,
-#                         payload_options=[
-#                             PayloadOptionResponse(
-#                                 payload_id=heading.payload_id,
-#                                 order_by=str(opt.order_by) if opt.order_by is not None else None,
-#                                 name=opt.name,
-#                                 current_setting=opt.current_setting,
-#                                 required=opt.required,
-#                                 description=opt.description,
-#                             )
-#                             for opt in (heading.payload_options or [])
-#                         ]
-#                     )
-#                     for heading in (payload.payload_headings or [])
-#                 ]
-#
-#                 )
-#             for payload in (attack.payload_headings or [])
-#         ],
-#         targets=[
-#             TargetResponse(
-#                 target_id=target.target_id,
-#                 id=target.id,
-#                 name=target.name,
-#                 default_setting=target.default_setting,
-#                 order_by=target.order_by
-#             )
-#             for target in (attack.targets or [])
-#         ]
-#     )
+            "target_options": targets}
 
 
 @app.get("/targets", status_code=200, response_model=List[TargetResponse])
@@ -498,8 +279,6 @@ def get_all_taargets(session: Session = Depends(get_session)) -> List[TargetResp
         select(Target)
     )
     return session.exec(statement).all()
-
-
 
 
 @app.get("/payloads", status_code=200, response_model=list[PayloadResponse])
@@ -555,51 +334,21 @@ def get_all_options(
     )
     return session.exec(statement).all()
 
-    # return [
-    #     PayloadResponse(
-    #         payload_id=payload.payload_id,
-    #         order_by=payload.order_by,
-    #         payload=payload.payload,
-    #         disclosure=payload.disclosure,
-    #         rank=payload.rank,
-    #         description=payload.description,
-    #         check_supported=payload.check_supported,
-    #         payload_headings=[
-    #             PayloadOptionHeadingResponse(
-    #                 payload_id=heading.payload_id,
-    #                 order_by=heading.order_by,
-    #                 name=heading.name,
-    #                 title=heading.title,
-    #                 type=heading.type,
-    #                 payload_options=[
-    #                     PayloadOptionResponse(
-    #                         payload_id=heading.payload_id,
-    #                         order_by=opt.order_by,
-    #                         name=opt.name,
-    #                         current_setting=opt.current_setting,
-    #                         required=opt.required,
-    #                         description=opt.description,
-    #                     )
-    #                     for opt in heading.payload_options
-    #                 ]
-    #             )
-    #             for heading in payload.payload_headings
-    #         ]
-    #     )
-    #     for payload in payloads
-    # ]
-
 
 import time
 import pexpect
 import os
 import re
 from pydantic import BaseModel
+
+
 class AttackSubmission(BaseModel):
     attack_id: int
     attack_module: str
     attack_name: str
     RCinfo: str
+
+
 @app.post("/run_single_attack", status_code=200, response_model=None)
 def read_attacks(
         attacks: List[AttackSubmission],
@@ -607,9 +356,9 @@ def read_attacks(
     results = []
     print(attacks)
 
-
     for attack in attacks:
-        filename = os.path.join('to_be_removed', attack.attack_name.replace(" ","_")+"_"+str(round(time.time() * 1000))+".rc")
+        filename = os.path.join('temp',
+                                attack.attack_name.replace(" ", "_") + "_" + str(round(time.time() * 1000)) + ".rc")
         with open(filename, "w") as file:
             file.write(attack.RCinfo)
         #     file.write("use " + attack.module +"\n")
@@ -634,35 +383,43 @@ def read_attacks(
         lines = []
 
         try:
+            result = {}
+
             child = pexpect.spawn("msfconsole -r " + filename)
             child.expect(pexpect.TIMEOUT, timeout=20)
             child.expect("Metasploit Documentation.*")
-            print("child after..............................................................")
-            print(child.after)
-            print("child before..............................................................")
-            print(child.before)
             child.expect("msf6.*")
-            print("child before..............................................................")
-            print(child.before)
+            successful_session_id = ""
             for line in child.before.splitlines():
                 line = line.decode('utf-8')
                 line = re.sub(r'\x1b\[[0-9;]*m', '', line)
                 lines.append(line)
+                matches = re.match("session ([0-9]+) opened", line)
+                if matches:
+                    successful_session_id = matches.group(1)
 
-            results.append({ 'attack_id': attack.attack_id,
-                             'module': attack.module,
-                             'response': lines
-                            })
-            print(child.before.splitlines())
-            # print(child.after.splitlines()
+            result = {'attack_id': attack.attack_id,
+                      'module': attack.attack_module,
+                      'response': lines,
+                      'PID': "",
+                      'session': successful_session_id,
+                      'section': 1
+                      }
+            print(results)
+
             child.send("exit")
             child.sendline("exit")
             child.close()
-        except:
-            results.append({ 'attack_id': attack.attack_id,
-                             'module': attack.attack_module,
-                             'response': lines
-                            })
+        except Exception as err:
+            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+            print(err)
+            lines = err
+            result = {'attack_id': attack.attack_id,
+                      'module': attack.attack_module,
+                      'response': lines,
+                      }
+        finally:
+            results.append(result)
 
         if os.path.exists(filename):
             os.remove(filename)
@@ -670,11 +427,7 @@ def read_attacks(
         else:
             print(f"File '{filename}' does not exist.")
 
-
     return results
-
-
-
 
     # child.expect(['msf6 >'])
     # # lines = child.after.splitlines()

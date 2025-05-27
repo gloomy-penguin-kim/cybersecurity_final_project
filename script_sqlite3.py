@@ -6,8 +6,8 @@ import re
 import time
 
 msf_type  = sys.argv[1]
-base_path = sys.argv[2]
-dry_run   = sys.argv[3]
+base_path = ""
+dry_run   = "x"
 database  = os.path.join(base_path, "database.db")
 
 if "exploits" != msf_type and "auxiliary" != msf_type and "post" != msf_type:
@@ -146,7 +146,7 @@ def find_nth(haystack: str, needle: str, n: int) -> int:
         start = haystack.find(needle, start + len(needle))
         n -= 1
     return start
-
+base_path = "temp/"
 filename = os.path.join(base_path, msf_type + "_search.txt")
 json_filename =os.path.join(base_path, msf_type + "_json.txt")
 info_filename = os.path.join(base_path, msf_type + "_info.txt")
@@ -329,7 +329,7 @@ def payloads_n_stuff(module, attack_id):
     lines = []
 
 
-    child_options.sendline('use ' + name)
+    child_options.sendline('use ' + module)
     lines = child_options.after.splitlines()
     while 'msf6' not in clean_line(lines[0]):
         child_options.expect('msf6 *')
