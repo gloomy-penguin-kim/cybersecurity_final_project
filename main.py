@@ -1,5 +1,8 @@
 from typing import Annotated
 
+
+# uvicorn main:app --reload
+
 import logging
 
 from fastapi import Depends, FastAPI
@@ -117,79 +120,7 @@ def get_multiple_attacks_for_attack(attackList: List[int],
         if not attack:
             continue  # or collect error info if you want
 
-        payload_options = []
-
-        for payload_loop in attack.payloads:
-            for heading in payload_loop.payload_headings:
-                heading_options = []
-                for option in heading.payload_options:
-                    heading_options.append({
-                        "option_name": option.name,
-                        "option_value": option.current_setting,
-                        "option_required": option.required,
-                        "option_description": option.description,
-                        "option_order_by": option.order_by
-                    })
-
-                payload_options.append({
-                    "payload_id": heading.payload_id,
-                    "payload_name": heading.payload.payload,
-                    "payload_order_by": heading.order_by,
-                    "payload_options": heading_options
-                })
-
-        option_headings = []
-        for option_heading in attack.option_headings:
-            heading_options = []
-            for option in option_heading.module_options:
-                heading_options.append({
-                    "option_name": option.name,
-                    "option_value": option.current_setting,
-                    "option_required": option.required,
-                    "option_description": option.description,
-                    "option_order_by": option.order_by
-                })
-
-            option_headings.append({
-                "module_name": option_heading.name,
-                "module_title": option_heading.title,
-                "module_order_by": option_heading.order_by,
-                "module_options": heading_options
-            })
-        targets = []
-        for target in attack.targets:
-            targets.append({
-                "target_id": target.target_id,
-                "id": target.id,
-                "name": target.name,
-                "default_setting": target.default_setting,
-                "order_by": target.order_by
-            })
-
-        response.append({
-            "attack_id": attack_id,
-            "module": attack.module,
-            "name": attack.name,
-            "platform": attack.platform,
-            "arch": attack.arch,
-            "privileged": attack.privileged,
-            "license": attack.license,
-            "rank": attack.rank,
-            "disclosed": attack.disclosed,
-            "provided_by": attack.provided_by,
-            "module_side_effects": attack.module_side_effects,
-            "module_stability": attack.module_stability,
-            "module_reliability": attack.module_reliability,
-            "check_supported": attack.check_supported,
-            "payload_information": attack.payload_information,
-            "description": attack.description,
-            "refs": attack.refs,
-            "type": attack.type,
-            "payload_default": attack.payload_default,
-            "payload_options": payload_options,
-            "module_options": option_headings,
-            "target_options": targets
-        })
+        response.append(get_single_attack(attack))
 
     return response
 
@@ -200,6 +131,12 @@ def get_payload_options_for_attack(attack_id: int, session: Session = Depends(ge
     attack = session.get(Attack, attack_id)
     if not attack:
         raise HTTPException(status_code=404, detail="Attack not found")
+
+    return get_single_attack(attack)
+
+def get_single_attack(attack: Attack):
+
+    attack_id = attack.attack_id
 
     payload_options = []
 
@@ -224,20 +161,21 @@ def get_payload_options_for_attack(attack_id: int, session: Session = Depends(ge
     option_headings = []
     for option_heading in attack.option_headings:
         heading_options = []
-        for option in option_heading.module_options:
-            heading_options.append({
-                "option_name": option.name,
-                "option_value": option.current_setting,
-                "option_required": option.required,
-                "option_description": option.description,
-                "option_order_by": option.order_by})
+        if "Payload" not in option_heading.title:
+            for option in option_heading.module_options:
+                heading_options.append({
+                    "option_name": option.name,
+                    "option_value": option.current_setting,
+                    "option_required": option.required,
+                    "option_description": option.description,
+                    "option_order_by": option.order_by})
 
-        option_headings.append({
-            "module_name": option_heading.name,
-            "module_title": option_heading.title,
-            "module_order_by": option_heading.order_by,
-            "module_options": heading_options
-        })
+            option_headings.append({
+                "module_name": option_heading.name,
+                "module_title": option_heading.title,
+                "module_order_by": option_heading.order_by,
+                "module_options": heading_options
+            })
 
     targets = []
     for target in attack.targets:
@@ -349,6 +287,11 @@ class AttackSubmission(BaseModel):
     RCinfo: str
 
 
+child = pexpect.spawn("msfconsole")
+child.expect(pexpect.TIMEOUT, timeout=20)
+child.expect("Metasploit Documentation.*")
+child.expect("msf6.*")
+
 @app.post("/run_single_attack", status_code=200, response_model=None)
 def read_attacks(
         attacks: List[AttackSubmission],
@@ -385,10 +328,11 @@ def read_attacks(
         try:
             result = {}
 
-            child = pexpect.spawn("msfconsole -r " + filename)
-            child.expect(pexpect.TIMEOUT, timeout=20)
-            child.expect("Metasploit Documentation.*")
+            child = pexpect.spawn("resource " + filename)
+            # child.expect(pexpect.TIMEOUT, timeout=20)
+            # child.expect("Metasploit Documentation.*")
             child.expect("msf6.*")
+
             successful_session_id = ""
             for line in child.before.splitlines():
                 line = line.decode('utf-8')
@@ -403,7 +347,8 @@ def read_attacks(
                       'response': lines,
                       'PID': "",
                       'session': successful_session_id,
-                      'section': 1
+                      'section': 1,
+                      'error': False
                       }
             print(results)
 
@@ -417,6 +362,7 @@ def read_attacks(
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
                       'response': lines,
+                      "error": True
                       }
         finally:
             results.append(result)
