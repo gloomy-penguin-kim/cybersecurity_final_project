@@ -30,6 +30,7 @@ class Attack(SQLModel, table=True):
     refs: Optional[str]
     type: Optional[str]
     payload_default: Optional[str]
+    target: Optional[str]
 
     option_headings: List["ModuleOptionHeading"] = Relationship(back_populates="attack")
     targets: List["Target"] = Relationship(back_populates="attack")

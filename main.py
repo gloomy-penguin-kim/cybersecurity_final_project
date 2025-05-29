@@ -208,7 +208,8 @@ def get_single_attack(attack: Attack):
             "payload_default": attack.payload_default,
             "payload_options": payload_options,
             "module_options": option_headings,
-            "target_options": targets}
+            "target_options": targets,
+            "target": attack.target}
 
 
 @app.get("/targets", status_code=200, response_model=List[TargetResponse])
@@ -287,21 +288,23 @@ class AttackSubmission(BaseModel):
     RCinfo: str
 
 
-child = pexpect.spawn("msfconsole")
-child.expect(pexpect.TIMEOUT, timeout=20)
-child.expect("Metasploit Documentation.*")
-child.expect("msf6.*")
+@app.get('/stop_button', status_code=200)
+def stop_button():
+    stop_pexpect = True
+    return "okay, process stopped"
+
 
 @app.post("/run_single_attack", status_code=200, response_model=None)
-def read_attacks(
+def run_attacks(
         attacks: List[AttackSubmission],
         session: SessionDep):
     results = []
     print(attacks)
 
     for attack in attacks:
+        filename = re.sub("[^a-zA-Z0-9-_]", "_", attack.attack_name)
         filename = os.path.join('temp',
-                                attack.attack_name.replace(" ", "_") + "_" + str(round(time.time() * 1000)) + ".rc")
+                                filename + "_" + str(round(time.time() * 1000)) + ".rc")
         with open(filename, "w") as file:
             file.write(attack.RCinfo)
         #     file.write("use " + attack.module +"\n")
@@ -325,13 +328,36 @@ def read_attacks(
                 print(line)
         lines = []
 
+        line_number = 0;
+
         try:
+
             result = {}
 
-            child = pexpect.spawn("resource " + filename)
+
+            stop_pexpect = False
+
+            if stop_pexpect: raise Exception("Stop Button was Pressed.")
+
+            child = pexpect.spawn("msfconsole")
+            line_number = 1
+
+            print(str(child))
+
+            child.expect(pexpect.TIMEOUT, timeout=20)
+            #child.expect("Metasploit Documentation.*")
+            line_number = 2
+            child.expect("msf6.*")
+            line_number = 3
+
+            child.sendline("resource " + filename)
+            line_number = 4
             # child.expect(pexpect.TIMEOUT, timeout=20)
             # child.expect("Metasploit Documentation.*")
             child.expect("msf6.*")
+            line_number = 5
+
+            if stop_pexpect: raise Exception("Stop Button was Pressed.")
 
             successful_session_id = ""
             for line in child.before.splitlines():
@@ -358,11 +384,11 @@ def read_attacks(
         except Exception as err:
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(err)
-            lines = err
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
-                      'response': lines,
-                      "error": True
+                      'response': lines + err,
+                      "error": True,
+                      'line_number': line_number
                       }
         finally:
             results.append(result)

