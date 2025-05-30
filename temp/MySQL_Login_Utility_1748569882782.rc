@@ -1,0 +1,19 @@
+use auxiliary/scanner/mysql/mysql_login
+set ANONYMOUS_LOGIN true
+set BLANK_PASSWORDS true
+set BRUTEFORCE_SPEED 5
+set CreateSession true
+set DB_ALL_CREDS false
+set DB_ALL_PASS false
+set DB_ALL_USERS false
+set DB_SKIP_EXISTING none
+set PASSWORD password
+set RHOSTS 127.0.0.1
+set RPORT 3306
+set STOP_ON_SUCCESS false
+set THREADS 1
+set USERNAME root
+set USER_AS_PASS false
+set VERBOSE true
+set CreateSession true
+exploit

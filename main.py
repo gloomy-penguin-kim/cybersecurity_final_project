@@ -98,25 +98,24 @@ from models.responses import PayloadResponse, AttackSimple, ModuleOptionHeadingR
     ModuleOptionResponse
 from typing import List
 
+session = get_session() 
 
 @app.get("/attacks", response_model=List[AttackSimple])
 def read_attacks(
-        session: Session = Depends(get_session),
         offset: int = 0,
         limit: int = 100,
-) -> List[AttackSimple]:
-    return session.exec(select(Attack.attack_id, Attack.name, Attack.module,
+) -> List[AttackSimple]: 
+    return Session(engine).exec(select(Attack.attack_id, Attack.name, Attack.module,
                                Attack.rank, Attack.disclosed,
                                Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
 
 
 @app.post("/attacks")
-def get_multiple_attacks_for_attack(attackList: List[int],
-                                    session: Session = Depends(get_session)):
+def get_multiple_attacks_for_attack(attackList: List[int]):
     response = []
 
     for attack_id in attackList:
-        attack = session.get(Attack, attack_id)
+        attack = Session(engine).get(Attack, attack_id)
         if not attack:
             continue  # or collect error info if you want
 
@@ -126,9 +125,9 @@ def get_multiple_attacks_for_attack(attackList: List[int],
 
 
 @app.get("/attacks/{attack_id}")
-def get_payload_options_for_attack(attack_id: int, session: Session = Depends(get_session)):
+def get_payload_options_for_attack(attack_id: int):
     # Get the attack
-    attack = session.get(Attack, attack_id)
+    attack = Session(engine).get(Attack, attack_id)
     if not attack:
         raise HTTPException(status_code=404, detail="Attack not found")
 
@@ -213,16 +212,15 @@ def get_single_attack(attack: Attack):
 
 
 @app.get("/targets", status_code=200, response_model=List[TargetResponse])
-def get_all_taargets(session: Session = Depends(get_session)) -> List[TargetResponse]:
+def get_all_targets() -> List[TargetResponse]:
     statement = (
         select(Target)
     )
-    return session.exec(statement).all()
+    return Session(engine).exec(statement).all()
 
 
 @app.get("/payloads", status_code=200, response_model=list[PayloadResponse])
-def get_all_payloads(
-        session: Session = Depends(get_session)) -> List[PayloadResponse]:
+def get_all_payloads() -> List[PayloadResponse]:
     statement = (
         select(Payload)
         .options(
@@ -231,7 +229,7 @@ def get_all_payloads(
         )
         .limit(10)
     )
-    return session.exec(statement).all()
+    return Session(engine).exec(statement).all()
 
 
 @app.post("/payloads/{attack_id}", status_code=200, response_model=list[PayloadResponse])
@@ -263,7 +261,7 @@ def get_all_options(session: Session = Depends(get_session)) -> List[PayloadResp
 @app.post("/options/{attack_id}", status_code=200, response_model=list[ModuleOptionHeadingResponse])
 def get_all_options(
         attack_id,
-        session: Session = Depends(get_session)) -> List[PayloadResponse]:
+        ) -> List[PayloadResponse]:
     statement = (
         select(ModuleOptionHeading)
         .where(ModuleOptionHeading.attack_id == attack_id)
@@ -339,7 +337,7 @@ def run_attacks(
 
             if stop_pexpect: raise Exception("Stop Button was Pressed.")
 
-            child = pexpect.spawn("msfconsole")
+            child = pexpect.spawn("msfconsole")  
             line_number = 1
 
             print(str(child))
@@ -386,7 +384,7 @@ def run_attacks(
             print(err)
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
-                      'response': lines + err,
+                      'response': err,
                       "error": True,
                       'line_number': line_number
                       }
