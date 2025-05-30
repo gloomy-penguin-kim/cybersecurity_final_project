@@ -1,11 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # 
 from typing import Annotated
 
 
 # uvicorn main:app --reload
-
-import logging
+ 
 
 from fastapi import Depends, FastAPI
 from sqlmodel import Session, SQLModel, create_engine
@@ -15,8 +14,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from fastapi.staticfiles import StaticFiles
 
-# Setup logging
-logger = logging.getLogger("uvicorn.error")
+# Setup logging 
 
 # --- Models ---
 
