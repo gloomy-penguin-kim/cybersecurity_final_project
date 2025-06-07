@@ -77,14 +77,27 @@ class AttackResponse(BaseModel):
     targets: List[TargetResponse] = []
 
 
+# class AttackSimple(BaseModel):
+#     attack_id: Optional[int]
+#     name: str
+#     module: str
+#     rank: Optional[str]
+#     disclosed: Optional[str]
+#     check_supported: Optional[str]
+#     type: Optional[str]
+
+
 class AttackSimple(BaseModel):
     attack_id: Optional[int]
     name: str
     module: str
     rank: Optional[str]
     disclosed: Optional[str]
-    check_supported: Optional[str]
+    session_required: Optional[str]
     type: Optional[str]
+    refs: Optional[str]
+    description: Optional[str]
+
 
 class TargetResponse(BaseModel):
     target_id: int

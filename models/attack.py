@@ -31,6 +31,7 @@ class Attack(SQLModel, table=True):
     type: Optional[str]
     payload_default: Optional[str]
     target: Optional[str]
+    session_required: Optional[str]
 
     option_headings: List["ModuleOptionHeading"] = Relationship(back_populates="attack")
     targets: List["Target"] = Relationship(back_populates="attack")

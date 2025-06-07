@@ -6,7 +6,7 @@ from typing import Annotated
 # uvicorn main:app --reload
  
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI, Depends
 from sqlmodel import Session, SQLModel, create_engine
 
 from starlette.middleware import Middleware
@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 # --- Database setup ---
 
-sqlite_file_name = "/home/kim/Documents/Output/database.db"
+sqlite_file_name = "database-exploit.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 connect_args = {"check_same_thread": False}
@@ -38,13 +38,11 @@ def get_session():
         yield session
 
 
-SessionDep = Annotated[Session, Depends(get_session)]
+# SessionDep = Annotated[Session, Depends(get_session)]
 
 # --- App ---
 
 origins = [
-    "http://localhost.tiangolo.com",
-    "https://localhost.tiangolo.com",
     "http://localhost",
     "http://localhost:8080",
     "http://localhost:8000",
@@ -70,8 +68,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import HTMLResponse
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
-
+ 
 from sqlalchemy.orm import selectinload
 
 PAGE_SIZE = 50
@@ -88,7 +87,7 @@ PAGE_SIZE = 50
 #                                 Attack.rank, Attack.disclosed,
 #                                 Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlmodel import select, Session
 from models.attack import Attack  # AttackPayloadLink
 from models.payload import Payload
@@ -102,20 +101,29 @@ session = get_session()
 
 @app.get("/attacks", response_model=List[AttackSimple])
 def read_attacks(
+        session: Session = Depends(get_session),
         offset: int = 0,
-        limit: int = 100,
-) -> List[AttackSimple]: 
-    return Session(engine).exec(select(Attack.attack_id, Attack.name, Attack.module,
-                               Attack.rank, Attack.disclosed,
-                               Attack.check_supported, Attack.type).offset(offset).limit(limit)).all()
+        limit: int = 100 
+) -> List[AttackSimple]:  
+    return session.exec(select(Attack.attack_id, 
+                               Attack.name, 
+                               Attack.module,
+                               Attack.rank, 
+                               Attack.disclosed,
+                               Attack.session_required, 
+                               Attack.type, 
+                               Attack.refs,
+                               Attack.description).offset(offset).limit(limit)).all()
 
 
 @app.post("/attacks")
-def get_multiple_attacks_for_attack(attackList: List[int]):
+def get_multiple_attacks_for_attack(
+        attackList: List[int],
+        session: Session = Depends(get_session)):
     response = []
 
     for attack_id in attackList:
-        attack = Session(engine).get(Attack, attack_id)
+        attack = session.get(Attack, attack_id)
         if not attack:
             continue  # or collect error info if you want
 
@@ -125,9 +133,11 @@ def get_multiple_attacks_for_attack(attackList: List[int]):
 
 
 @app.get("/attacks/{attack_id}")
-def get_payload_options_for_attack(attack_id: int):
+def get_payload_options_for_attack(
+        attack_id: int,
+        session: Session = Depends(get_session)):
     # Get the attack
-    attack = Session(engine).get(Attack, attack_id)
+    attack = session.get(Attack, attack_id)
     if not attack:
         raise HTTPException(status_code=404, detail="Attack not found")
 
@@ -208,7 +218,8 @@ def get_single_attack(attack: Attack):
             "payload_options": payload_options,
             "module_options": option_headings,
             "target_options": targets,
-            "target": attack.target}
+            "target": attack.target,
+            "session_required": attack.session_required}
 
 
 @app.get("/targets", status_code=200, response_model=List[TargetResponse])
@@ -234,8 +245,7 @@ def get_all_payloads() -> List[PayloadResponse]:
 
 @app.post("/payloads/{attack_id}", status_code=200, response_model=list[PayloadResponse])
 def get_all_payloads(
-        attakc_id,
-        session: Session = Depends(get_session)) -> List[PayloadResponse]:
+        attakc_id) -> List[PayloadResponse]:
     statement = (
         select(Payload)
         .options(
@@ -244,18 +254,18 @@ def get_all_payloads(
         )
         .limit(10)
     )
-    return session.exec(statement).all()
+    return Session(engine).exec(statement).all()
 
 
 @app.get("/options", status_code=200, response_model=list[ModuleOptionHeadingResponse])
-def get_all_options(session: Session = Depends(get_session)) -> List[PayloadResponse]:
+def get_all_options() -> List[PayloadResponse]:
     statement = (
         select(ModuleOptionHeading)
         .options(
             selectinload(ModuleOptionHeading.module_options)
         )
     )
-    return session.exec(statement).all()
+    return Session(engine).exec(statement).all()
 
 
 @app.post("/options/{attack_id}", status_code=200, response_model=list[ModuleOptionHeadingResponse])
@@ -269,7 +279,7 @@ def get_all_options(
             selectinload(ModuleOptionHeading.module_options)
         )
     )
-    return session.exec(statement).all()
+    return Session(engine).exec(statement).all()
 
 
 import time
@@ -277,6 +287,7 @@ import pexpect
 import os
 import re
 from pydantic import BaseModel
+import pexpectfile as p
 
 
 class AttackSubmission(BaseModel):
@@ -291,16 +302,107 @@ def stop_button():
     stop_pexpect = True
     return "okay, process stopped"
 
+@app.get("/close_session/{session_id}", status_code=200, response_model=None)
+def get_open_sesssions(session_id):
+    try: 
+        p.child.expect(pexpect.TIMEOUT, timeout=3)
+        p.child.sendline('sessions -K -S "session_id:' + str(int(session_id)) + '"')
+        p.child.expect("msf6.*")
+        print(p.child.before.splitlines()) 
+        print(len(p.child.before.splitlines()) )
+    except Exception as e: 
+        p.spawn_msf_child() 
+        get_open_sesssions()
+ 
+
+@app.get("/get_sessions", status_code=200, response_model=None)
+def get_open_sesssions(): 
+
+    p.child.expect(pexpect.TIMEOUT, timeout=3)
+    p.child.sendline('sessions -v')
+    p.child.expect("msf6.*")
+    print(p.child.before.splitlines()) 
+    print(len(p.child.before.splitlines()) )
+
+    lines = p.child.before.splitlines() 
+
+    if len(lines) > 6 and 'No active sessions' in lines[6].decode('utf-8'):
+        return [] 
+    
+    lines = lines[6:]
+
+    i = 0 
+    results = [] 
+    row = {} 
+    for line in lines: 
+        line = line.decode('utf-8')
+
+        if "Session ID:" in line: 
+            row["session_id"] = line.split(':')[1].strip() 
+        if "Name:" in line: 
+            if len(line.split(':')) >= 2: 
+                row["name"] = line.split(':')[1].strip() 
+        if "Type:" in line: 
+            row["type"] = line.split(':')[1].strip() 
+        if "Info:" in line: 
+            row["info"] = line.split(':')[1].strip() 
+        if "Tunnel:" in line: 
+            row["tunnel"] = line.split(':')[1].strip() 
+        if "Via:" in line: 
+            row["via"] = line.split(':')[1].strip() 
+        if "Encrypted:" in line: 
+            row["encrypted"] = line.split(':')[1].strip() 
+        if "UUID:" in line: 
+            if len(line.split(':')) >= 2: 
+                row["uuid"] = line.split(':')[1].strip() 
+        if "CheckIn:" in line: 
+            row["checkin"] = line.split(':')[1].strip() 
+        if "Registered:" in line: 
+            row["registered"] = line.split(':')[1].strip() 
+
+        if line == "":
+            if row != {}: results.append(row) 
+            row = {} 
+
+    return results
+
+@app.get("/send_control_z") 
+def send_control_z(): 
+    print("PID => "+ str(p.child.pid))
+    p.child.sendcontrol('z')
+    p.child.sendcontrol('Z')
+    p.child.close() 
+
+# [
+#     "sessions -v",
+#     "","[0m",
+#     "Active sessions",
+#     "===============",
+#     "",
+#     "  Session ID: 1",
+#     "        Name: ",
+#     "        Type: postgresql Linux",
+#     "        Info: PostgreSQL postgres @ 127.0.0.1:5432",
+#     "      Tunnel: 127.0.0.1:36633 -> 127.0.0.1:5432 (127.0.0.1)",
+#     "         Via: auxiliary/scanner/postgres/postgres_login",
+#     "   Encrypted: No",
+#     "        UUID: ",
+#     "     CheckIn: <none>",
+#     "  Registered: No",
+#     "",
+#     "",
+#     "","[4m"
+
 
 @app.post("/run_single_attack", status_code=200, response_model=None)
 def run_attacks(
-        attacks: List[AttackSubmission],
-        session: SessionDep):
+        attacks: List[AttackSubmission]):
     results = []
     print(attacks)
 
     for attack in attacks:
         filename = re.sub("[^a-zA-Z0-9-_]", "_", attack.attack_name)
+        filename = re.sub("\\s+", "_", filename)
         filename = os.path.join('temp',
                                 filename + "_" + str(round(time.time() * 1000)) + ".rc")
         with open(filename, "w") as file:
@@ -331,63 +433,60 @@ def run_attacks(
         try:
 
             result = {}
+ 
+ 
 
+            # child = pexpect.spawn("msfconsole")  
+            # line_number = 1
 
-            stop_pexpect = False
+            # print(str(child))
 
-            if stop_pexpect: raise Exception("Stop Button was Pressed.")
-
-            child = pexpect.spawn("msfconsole")  
-            line_number = 1
-
-            print(str(child))
-
-            child.expect(pexpect.TIMEOUT, timeout=20)
-            #child.expect("Metasploit Documentation.*")
-            line_number = 2
-            child.expect("msf6.*")
+            p.child.expect(pexpect.TIMEOUT, timeout=20)
+            # #child.expect("Metasploit Documentation.*")
+            # line_number = 2
+            # child.expect("msf6.*")
             line_number = 3
 
-            child.sendline("resource " + filename)
+            p.child.sendline("resource " + filename)
             line_number = 4
             # child.expect(pexpect.TIMEOUT, timeout=20)
             # child.expect("Metasploit Documentation.*")
-            child.expect("msf6.*")
+            p.child.expect("msf6.*")
             line_number = 5
-
-            if stop_pexpect: raise Exception("Stop Button was Pressed.")
-
+  
             successful_session_id = ""
-            for line in child.before.splitlines():
+            for line in p.child.before.splitlines():
                 line = line.decode('utf-8')
                 line = re.sub(r'\x1b\[[0-9;]*m', '', line)
                 lines.append(line)
-                matches = re.match("session ([0-9]+) opened", line)
+                matches = re.match(".*session ([0-9]+) opened.*", line)
                 if matches:
                     successful_session_id = matches.group(1)
 
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
                       'response': lines,
-                      'PID': "",
+                      'PID': p.child.pid,
                       'session': successful_session_id,
                       'section': 1,
                       'error': False
                       }
             print(results)
 
-            child.send("exit")
-            child.sendline("exit")
-            child.close()
+            # child.send("exit")
+            # child.sendline("exit")
+            # child.close()
         except Exception as err:
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(err)
+            print(err) 
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
-                      'response': err,
+                      'response': ["Unexpected " + str(err) + ", " + str(type(err))],
                       "error": True,
                       'line_number': line_number
                       }
+            p.spawn_msf_child() 
+
         finally:
             results.append(result)
 
@@ -398,6 +497,8 @@ def run_attacks(
             print(f"File '{filename}' does not exist.")
 
     return results
+
+
 
     # child.expect(['msf6 >'])
     # # lines = child.after.splitlines()
@@ -422,4 +523,9 @@ def run_attacks(
     # #child.expect(['^msf6*'])
     # child.close()
 
+import uvicorn 
 
+port_number = os.environ.get("VITE_METASPLOIT_PORT") or 8082
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=int(port_number), reload=True)
