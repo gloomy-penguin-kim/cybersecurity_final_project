@@ -69,7 +69,7 @@ app.add_middleware(
 )
 
 from fastapi.responses import HTMLResponse
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+app.mount("/app", StaticFiles(directory="app", html=True), name="app")
  
 from sqlalchemy.orm import selectinload
 
@@ -525,7 +525,7 @@ def run_attacks(
 
 import uvicorn 
 
-port_number = os.environ.get("VITE_METASPLOIT_PORT") or 8082
+port_number = os.environ.get("VITE_METASPLOIT_PORT") or 8084
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=int(port_number), reload=True)

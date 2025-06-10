@@ -1,0 +1,33 @@
+ 
+services:
+  webapp:
+    restart: always
+    image: metameta:latest
+    ports:
+      - "8085:8085"   
+    environment:
+      VITE_METASPLOIT_PORT: 8085
+      VITE_METASPLOIT_API_URL: http://0.0.0.0 
+    depends_on:
+      - postgres_db   
+    networks:
+      - app_network   
+
+  postgres_db:
+    restart: always
+    image: postgres:latest   
+    container_name: postgres_db   
+    environment:
+      POSTGRES_USER: postgres   
+      POSTGRES_PASSWORD: password   
+      POSTGRES_DB: MegaCorpOne     
+    volumes:
+      - ./docker_postgres_setup.sh:/docker-entrypoint-initdb.d/initdb.sh 
+    networks:
+      - app_network  #  Connect the database to the web app network
+
+networks:
+  app_network:
+
+volumes:
+  postgres_data:  # Define the volume for persistent data

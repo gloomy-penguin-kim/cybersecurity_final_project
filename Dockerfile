@@ -5,6 +5,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y python3 python3-pip
 
+RUN apt-get install -y net-tools
 
 COPY requirements.txt .
 
@@ -16,12 +17,10 @@ ADD https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/te
 RUN chmod 755 msfinstall 
 RUN ./msfinstall
 
-ENV VITE_METASPLOIT_PORT=8084
+ENV VITE_METASPLOIT_PORT=8085
 ENV VITE_METASPLOIT_API_URL=http://0.0.0.0 
 
-RUN APT-INSTALL NET-TOOLS 
-
 EXPOSE 5000
-EXPOSE 8084 
+EXPOSE 8085
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8084"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8085"]
