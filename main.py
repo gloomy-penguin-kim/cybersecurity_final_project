@@ -287,7 +287,7 @@ import pexpect
 import os
 import re
 from pydantic import BaseModel
-import pexpectfile as p
+import pexpectfile as p 
 
 
 class AttackSubmission(BaseModel):
@@ -318,7 +318,15 @@ def get_open_sesssions(session_id):
 @app.get("/get_sessions", status_code=200, response_model=None)
 def get_open_sesssions(): 
 
-    p.child.expect(pexpect.TIMEOUT, timeout=3)
+    # global iAmMultiThreadedNow 
+
+    # while not iAmMultiThreadedNow:
+    #     print("waiting in session")
+    #     time.sleep(0.1) 
+
+    # iAmMultiThreadedNow = False 
+
+    p.child.expect(pexpect.TIMEOUT, timeout=5)
     p.child.sendline('sessions -v')
     p.child.expect("msf6.*")
     print(p.child.before.splitlines()) 
@@ -364,6 +372,8 @@ def get_open_sesssions():
             if row != {}: results.append(row) 
             row = {} 
 
+    iAmMultiThreadedNow = True 
+
     return results
 
 @app.get("/send_control_z") 
@@ -400,57 +410,44 @@ def run_attacks(
     results = []
     print(attacks)
 
+    # global iAmMultiThreadedNow 
+
+    # while not iAmMultiThreadedNow:
+    #     print("waiting in single run attack")
+    #     time.sleep(0.1) 
+
+    # iAmMultiThreadedNow = False 
+
     for attack in attacks:
         filename = re.sub("[^a-zA-Z0-9-_]", "_", attack.attack_name)
         filename = re.sub("\\s+", "_", filename)
         filename = os.path.join('temp',
                                 filename + "_" + str(round(time.time() * 1000)) + ".rc")
         with open(filename, "w") as file:
-            file.write(attack.RCinfo)
-        #     file.write("use " + attack.module +"\n")
-        #     for option_heading in attack.option_headings:
-        #         for option in option_heading.options:
-        #             if option.current_setting != "":
-        #                 file.write("set " + option.name + " " + option.current_setting + "\n")
-        #     for option  in attack.extras:
-        #         if option.value != "":
-        #             file.write("set " + option.name + " " + option.value + "\n")
-        #     if attack.target != "": file.write("set target " + str(attack.target) + "\n")
-        #     if attack.payload != "":
-        #         file.write("set payload " + str(attack.payload) + "\n")
-        #     if attack.check == "run": file.write("exploit\n")
-        #     if attack.check == "check": file.write("check\n")
+            file.write(attack.RCinfo) 
+
 
         file_contents = []
         with open(filename, "r") as file:
             file_contents = file.readlines()
             for line in file_contents:
                 print(line)
+
+        
+
         lines = []
 
-        line_number = 0;
+        line_number = 0
 
         try:
 
-            result = {}
- 
- 
+            result = {} 
 
-            # child = pexpect.spawn("msfconsole")  
-            # line_number = 1
-
-            # print(str(child))
-
-            p.child.expect(pexpect.TIMEOUT, timeout=20)
-            # #child.expect("Metasploit Documentation.*")
-            # line_number = 2
-            # child.expect("msf6.*")
+            p.child.expect(pexpect.TIMEOUT, timeout=20) 
             line_number = 3
 
             p.child.sendline("resource " + filename)
-            line_number = 4
-            # child.expect(pexpect.TIMEOUT, timeout=20)
-            # child.expect("Metasploit Documentation.*")
+            line_number = 4 
             p.child.expect("msf6.*")
             line_number = 5
   
@@ -461,7 +458,7 @@ def run_attacks(
                 lines.append(line)
                 matches = re.match(".*session ([0-9]+) opened.*", line)
                 if matches:
-                    successful_session_id = matches.group(1)
+                    successful_session_id = matches.group(1) 
 
             result = {'attack_id': attack.attack_id,
                       'module': attack.attack_module,
@@ -469,13 +466,11 @@ def run_attacks(
                       'PID': p.child.pid,
                       'session': successful_session_id,
                       'section': 1,
-                      'error': False
+                      'error': False,
+                      'line_number': line_number
                       }
-            print(results)
+            print(results) 
 
-            # child.send("exit")
-            # child.sendline("exit")
-            # child.close()
         except Exception as err:
             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             print(err) 
@@ -487,42 +482,19 @@ def run_attacks(
                       }
             p.spawn_msf_child() 
 
+
         finally:
             results.append(result)
+            iAmMultiThreadedNow = True   
 
-        if os.path.exists(filename):
-            os.remove(filename)
-            print(f"File '{filename}' deleted successfully.")
-        else:
-            print(f"File '{filename}' does not exist.")
+            if os.path.exists(filename):
+                os.remove(filename)
+                print(f"File '{filename}' deleted successfully.")
+            else:
+                print(f"File '{filename}' does not exist.") 
 
     return results
-
-
-
-    # child.expect(['msf6 >'])
-    # # lines = child.after.splitlines()
-    # child.sendLine('use ' + attack.module)
-    # child.expect('msf6 >')
-    # # lines = child.after.splitlines()
-    #
-    # for line in lines:
-    #     print(line)
-    # # lines = []
-    # child.sendline('info ' + attack.module)
-    # child.expect(['^msf6*'])
-
-    # r = { "before": child.before.splitlines(), "after": child.after.splitlines()}
-
-    # # # while 'msf6 ' not in lines[0].decode('utf-8'):
-    # # #     child.expect('msf6 *')
-    # # #     lines = child.before.splitlines()
-
-    # child.sendLine('exit')
-    # lines = child.after.splitlines()
-    # #child.expect(['^msf6*'])
-    # child.close()
-
+ 
 import uvicorn 
 
 port_number = os.environ.get("VITE_METASPLOIT_PORT") or 8084
