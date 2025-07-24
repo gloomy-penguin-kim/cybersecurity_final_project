@@ -22,4 +22,4 @@ How to run:
    - python3 script_sqlite3.py  - look at file for arguments, all may not be in use, I can clean this up later
 - python3 main.py for the fastapi to run. should be found at 0.0.0.0:8084/app
 
-- to mess with the React front end see my other repo at: https://github.com/gloomy-penguin-kim/cybersecurity_final_frontend 
+- to mess with the React front end see my other repo at: https://github.com/gloomy-penguin-kim/cybersecurity_final_frontend but the built dist are in the /app folder 
