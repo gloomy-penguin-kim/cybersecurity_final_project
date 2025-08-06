@@ -1,26 +1,18 @@
-FROM ubuntu:latest
-#FROM python:3.9-slim-buster
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim
 
+# Set the working directory in the container
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y python3 python3-pip
+# Copy the current directory contents into the container at /app
+COPY . /app
 
-RUN apt-get install -y net-tools
+# Install any needed dependencies specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY requirements.txt .
+# Make port 8080 available to the world outside this container (if applicable)
+EXPOSE 8084
 
-RUN pip3 install  --break-system-packages --no-cache-dir -r requirements.txt
+# Define the command to run your application
+CMD ["python", "main.py"]
 
-COPY . .
-
-ADD https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb  msfinstall 
-RUN chmod 755 msfinstall 
-RUN ./msfinstall
-
-ENV VITE_METASPLOIT_PORT=8085
-ENV VITE_METASPLOIT_API_URL=http://0.0.0.0 
-
-EXPOSE 5000
-EXPOSE 8085
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8085"]

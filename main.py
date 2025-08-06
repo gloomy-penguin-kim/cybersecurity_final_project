@@ -221,73 +221,9 @@ def get_single_attack(attack: Attack):
             "target": attack.target,
             "session_required": attack.session_required}
 
-
-@app.get("/targets", status_code=200, response_model=List[TargetResponse])
-def get_all_targets() -> List[TargetResponse]:
-    statement = (
-        select(Target)
-    )
-    return Session(engine).exec(statement).all()
-
-
-@app.get("/payloads", status_code=200, response_model=list[PayloadResponse])
-def get_all_payloads() -> List[PayloadResponse]:
-    statement = (
-        select(Payload)
-        .options(
-            selectinload(Payload.payload_headings),
-            selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options)
-        )
-        .limit(10)
-    )
-    return Session(engine).exec(statement).all()
-
-
-@app.post("/payloads/{attack_id}", status_code=200, response_model=list[PayloadResponse])
-def get_all_payloads(
-        attakc_id) -> List[PayloadResponse]:
-    statement = (
-        select(Payload)
-        .options(
-            selectinload(Payload.payload_headings),
-            selectinload(Payload.payload_headings).selectinload(PayloadOptionHeading.payload_options)
-        )
-        .limit(10)
-    )
-    return Session(engine).exec(statement).all()
-
-
-@app.get("/options", status_code=200, response_model=list[ModuleOptionHeadingResponse])
-def get_all_options() -> List[PayloadResponse]:
-    statement = (
-        select(ModuleOptionHeading)
-        .options(
-            selectinload(ModuleOptionHeading.module_options)
-        )
-    )
-    return Session(engine).exec(statement).all()
-
-
-@app.post("/options/{attack_id}", status_code=200, response_model=list[ModuleOptionHeadingResponse])
-def get_all_options(
-        attack_id,
-        ) -> List[PayloadResponse]:
-    statement = (
-        select(ModuleOptionHeading)
-        .where(ModuleOptionHeading.attack_id == attack_id)
-        .options(
-            selectinload(ModuleOptionHeading.module_options)
-        )
-    )
-    return Session(engine).exec(statement).all()
-
-
-import time
-import pexpect
-import os
-import re
-from pydantic import BaseModel
-import pexpectfile as p 
+   
+import os 
+from pydantic import BaseModel 
 
 
 class AttackSubmission(BaseModel):
@@ -297,91 +233,91 @@ class AttackSubmission(BaseModel):
     RCinfo: str
 
 
-@app.get('/stop_button', status_code=200)
-def stop_button():
-    stop_pexpect = True
-    return "okay, process stopped"
+# @app.get('/stop_button', status_code=200)
+# def stop_button():
+#     stop_pexpect = True
+#     return "okay, process stopped"
 
-@app.get("/close_session/{session_id}", status_code=200, response_model=None)
-def get_open_sesssions(session_id):
-    try: 
-        p.child.expect(pexpect.TIMEOUT, timeout=3)
-        p.child.sendline('sessions -K -S "session_id:' + str(int(session_id)) + '"')
-        p.child.expect("msf6.*")
-        print(p.child.before.splitlines()) 
-        print(len(p.child.before.splitlines()) )
-    except Exception as e: 
-        p.spawn_msf_child() 
-        get_open_sesssions()
+# @app.get("/close_session/{session_id}", status_code=200, response_model=None)
+# def get_open_sesssions(session_id):
+#     try: 
+#         p.child.expect(pexpect.TIMEOUT, timeout=3)
+#         p.child.sendline('sessions -K -S "session_id:' + str(int(session_id)) + '"')
+#         p.child.expect("msf6.*")
+#         print(p.child.before.splitlines()) 
+#         print(len(p.child.before.splitlines()) )
+#     except Exception as e: 
+#         p.spawn_msf_child() 
+#         get_open_sesssions()
  
 
-@app.get("/get_sessions", status_code=200, response_model=None)
-def get_open_sesssions(): 
+# @app.get("/get_sessions", status_code=200, response_model=None)
+# def get_open_sesssions(): 
 
-    # global iAmMultiThreadedNow 
+    # # global iAmMultiThreadedNow 
 
-    # while not iAmMultiThreadedNow:
-    #     print("waiting in session")
-    #     time.sleep(0.1) 
+    # # while not iAmMultiThreadedNow:
+    # #     print("waiting in session")
+    # #     time.sleep(0.1) 
 
-    # iAmMultiThreadedNow = False 
+    # # iAmMultiThreadedNow = False 
 
-    p.child.expect(pexpect.TIMEOUT, timeout=5)
-    p.child.sendline('sessions -v')
-    p.child.expect("msf6.*")
-    print(p.child.before.splitlines()) 
-    print(len(p.child.before.splitlines()) )
+    # p.child.expect(pexpect.TIMEOUT, timeout=5)
+    # p.child.sendline('sessions -v')
+    # p.child.expect("msf6.*")
+    # print(p.child.before.splitlines()) 
+    # print(len(p.child.before.splitlines()) )
 
-    lines = p.child.before.splitlines() 
+    # lines = p.child.before.splitlines() 
 
-    if len(lines) > 6 and 'No active sessions' in lines[6].decode('utf-8'):
-        return [] 
+    # if len(lines) > 6 and 'No active sessions' in lines[6].decode('utf-8'):
+    #     return [] 
     
-    lines = lines[6:]
+    # lines = lines[6:]
 
-    i = 0 
-    results = [] 
-    row = {} 
-    for line in lines: 
-        line = line.decode('utf-8')
+    # i = 0 
+    # results = [] 
+    # row = {} 
+    # for line in lines: 
+    #     line = line.decode('utf-8')
 
-        if "Session ID:" in line: 
-            row["session_id"] = line.split(':')[1].strip() 
-        if "Name:" in line: 
-            if len(line.split(':')) >= 2: 
-                row["name"] = line.split(':')[1].strip() 
-        if "Type:" in line: 
-            row["type"] = line.split(':')[1].strip() 
-        if "Info:" in line: 
-            row["info"] = line.split(':')[1].strip() 
-        if "Tunnel:" in line: 
-            row["tunnel"] = line.split(':')[1].strip() 
-        if "Via:" in line: 
-            row["via"] = line.split(':')[1].strip() 
-        if "Encrypted:" in line: 
-            row["encrypted"] = line.split(':')[1].strip() 
-        if "UUID:" in line: 
-            if len(line.split(':')) >= 2: 
-                row["uuid"] = line.split(':')[1].strip() 
-        if "CheckIn:" in line: 
-            row["checkin"] = line.split(':')[1].strip() 
-        if "Registered:" in line: 
-            row["registered"] = line.split(':')[1].strip() 
+    #     if "Session ID:" in line: 
+    #         row["session_id"] = line.split(':')[1].strip() 
+    #     if "Name:" in line: 
+    #         if len(line.split(':')) >= 2: 
+    #             row["name"] = line.split(':')[1].strip() 
+    #     if "Type:" in line: 
+    #         row["type"] = line.split(':')[1].strip() 
+    #     if "Info:" in line: 
+    #         row["info"] = line.split(':')[1].strip() 
+    #     if "Tunnel:" in line: 
+    #         row["tunnel"] = line.split(':')[1].strip() 
+    #     if "Via:" in line: 
+    #         row["via"] = line.split(':')[1].strip() 
+    #     if "Encrypted:" in line: 
+    #         row["encrypted"] = line.split(':')[1].strip() 
+    #     if "UUID:" in line: 
+    #         if len(line.split(':')) >= 2: 
+    #             row["uuid"] = line.split(':')[1].strip() 
+    #     if "CheckIn:" in line: 
+    #         row["checkin"] = line.split(':')[1].strip() 
+    #     if "Registered:" in line: 
+    #         row["registered"] = line.split(':')[1].strip() 
 
-        if line == "":
-            if row != {}: results.append(row) 
-            row = {} 
+    #     if line == "":
+    #         if row != {}: results.append(row) 
+    #         row = {} 
 
-    iAmMultiThreadedNow = True 
+    # iAmMultiThreadedNow = True 
 
-    return results
+    # return results
 
-@app.get("/send_control_z") 
-def send_control_z(): 
-    print("PID => "+ str(p.child.pid))
-    p.child.sendcontrol('z')
-    p.child.sendcontrol('Z')
-    p.child.close() 
+# @app.get("/send_control_z") 
+# def send_control_z(): 
+#     print("PID => "+ str(p.child.pid))
+#     p.child.sendcontrol('z')
+#     p.child.sendcontrol('Z')
+#     p.child.close() 
 
 # [
 #     "sessions -v",
@@ -404,96 +340,96 @@ def send_control_z():
 #     "","[4m"
 
 
-@app.post("/run_single_attack", status_code=200, response_model=None)
-def run_attacks(
-        attacks: List[AttackSubmission]):
-    results = []
-    print(attacks)
+# @app.post("/run_single_attack", status_code=200, response_model=None)
+# def run_attacks(
+#         attacks: List[AttackSubmission]):
+#     results = []
+#     print(attacks)
 
-    # global iAmMultiThreadedNow 
+#     # global iAmMultiThreadedNow 
 
-    # while not iAmMultiThreadedNow:
-    #     print("waiting in single run attack")
-    #     time.sleep(0.1) 
+#     # while not iAmMultiThreadedNow:
+#     #     print("waiting in single run attack")
+#     #     time.sleep(0.1) 
 
-    # iAmMultiThreadedNow = False 
+#     # iAmMultiThreadedNow = False 
 
-    for attack in attacks:
-        filename = re.sub("[^a-zA-Z0-9-_]", "_", attack.attack_name)
-        filename = re.sub("\\s+", "_", filename)
-        filename = os.path.join('temp',
-                                filename + "_" + str(round(time.time() * 1000)) + ".rc")
-        with open(filename, "w") as file:
-            file.write(attack.RCinfo) 
+#     for attack in attacks:
+#         filename = re.sub("[^a-zA-Z0-9-_]", "_", attack.attack_name)
+#         filename = re.sub("\\s+", "_", filename)
+#         filename = os.path.join('temp',
+#                                 filename + "_" + str(round(time.time() * 1000)) + ".rc")
+#         with open(filename, "w") as file:
+#             file.write(attack.RCinfo) 
 
 
-        file_contents = []
-        with open(filename, "r") as file:
-            file_contents = file.readlines()
-            for line in file_contents:
-                print(line)
+#         file_contents = []
+#         with open(filename, "r") as file:
+#             file_contents = file.readlines()
+#             for line in file_contents:
+#                 print(line)
 
         
 
-        lines = []
+#         lines = []
 
-        line_number = 0
+#         line_number = 0
 
-        try:
+#         try:
 
-            result = {} 
+#             result = {} 
 
-            p.child.expect(pexpect.TIMEOUT, timeout=20) 
-            line_number = 3
+#             p.child.expect(pexpect.TIMEOUT, timeout=20) 
+#             line_number = 3
 
-            p.child.sendline("resource " + filename)
-            line_number = 4 
-            p.child.expect("msf6.*")
-            line_number = 5
+#             p.child.sendline("resource " + filename)
+#             line_number = 4 
+#             p.child.expect("msf6.*")
+#             line_number = 5
   
-            successful_session_id = ""
-            for line in p.child.before.splitlines():
-                line = line.decode('utf-8')
-                line = re.sub(r'\x1b\[[0-9;]*m', '', line)
-                lines.append(line)
-                matches = re.match(".*session ([0-9]+) opened.*", line)
-                if matches:
-                    successful_session_id = matches.group(1) 
+#             successful_session_id = ""
+#             for line in p.child.before.splitlines():
+#                 line = line.decode('utf-8')
+#                 line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+#                 lines.append(line)
+#                 matches = re.match(".*session ([0-9]+) opened.*", line)
+#                 if matches:
+#                     successful_session_id = matches.group(1) 
 
-            result = {'attack_id': attack.attack_id,
-                      'module': attack.attack_module,
-                      'response': lines,
-                      'PID': p.child.pid,
-                      'session': successful_session_id,
-                      'section': 1,
-                      'error': False,
-                      'line_number': line_number
-                      }
-            print(results) 
+#             result = {'attack_id': attack.attack_id,
+#                       'module': attack.attack_module,
+#                       'response': lines,
+#                       'PID': p.child.pid,
+#                       'session': successful_session_id,
+#                       'section': 1,
+#                       'error': False,
+#                       'line_number': line_number
+#                       }
+#             print(results) 
 
-        except Exception as err:
-            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(err) 
-            result = {'attack_id': attack.attack_id,
-                      'module': attack.attack_module,
-                      'response': ["Unexpected " + str(err) + ", " + str(type(err))],
-                      "error": True,
-                      'line_number': line_number
-                      }
-            p.spawn_msf_child() 
+#         except Exception as err:
+#             print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+#             print(err) 
+#             result = {'attack_id': attack.attack_id,
+#                       'module': attack.attack_module,
+#                       'response': ["Unexpected " + str(err) + ", " + str(type(err))],
+#                       "error": True,
+#                       'line_number': line_number
+#                       }
+#             p.spawn_msf_child() 
 
 
-        finally:
-            results.append(result)
-            iAmMultiThreadedNow = True   
+#         finally:
+#             results.append(result)
+#             iAmMultiThreadedNow = True   
 
-            if os.path.exists(filename):
-                os.remove(filename)
-                print(f"File '{filename}' deleted successfully.")
-            else:
-                print(f"File '{filename}' does not exist.") 
+#             if os.path.exists(filename):
+#                 os.remove(filename)
+#                 print(f"File '{filename}' deleted successfully.")
+#             else:
+#                 print(f"File '{filename}' does not exist.") 
 
-    return results
+#     return results
  
 import uvicorn 
 
