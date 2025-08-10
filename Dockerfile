@@ -9,10 +9,15 @@ COPY . /app
 
 # Install any needed dependencies specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+ 
 
 # Make port 8080 available to the world outside this container (if applicable)
-EXPOSE 8084
+EXPOSE $PORT
 
 # Define the command to run your application
-CMD ["python", "main.py"]
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
 
+
+# docker buildx build .  -t registry.heroku.com/metasploit-gui/web  --provenance=false --push 
+# heroku container:release web -a metasploit-gui 
+# heroku logs --tail 

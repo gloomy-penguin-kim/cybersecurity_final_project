@@ -430,10 +430,11 @@ class AttackSubmission(BaseModel):
 #                 print(f"File '{filename}' does not exist.") 
 
 #     return results
- 
-import uvicorn 
-
-port_number = os.environ.get("VITE_METASPLOIT_PORT") or 8084
+  
+import os
+import uvicorn
+from main import app  # or however you import app
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(port_number), reload=True)
+    port = int(os.environ.get("PORT", 8084))
+    uvicorn.run(app, host="0.0.0.0", port=port)
