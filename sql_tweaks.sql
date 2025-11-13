@@ -22,3 +22,19 @@ WHERE	attack.payload_default is not null and
 					ap.payload = attack.payload_default
 		)   
 ;
+
+
+update 	session_required = 'no';
+from 	attacks_attack;
+
+update  session_required = 'yes' 
+FROM	attacks_attack a
+where 	a.attack_id in ( 
+		SELECT	distinct attack.attack_id 
+		FROM	attacks_attack as attack
+				left outer join attacks_option_heading as oh
+					on oh.attack_id = attack.attack_id 
+				join attacks_option as o 
+					on o.option_heading_id = oh.option_heading_id and 
+						o.name = 'SESSION' 
+		);

@@ -59,6 +59,7 @@ middleware = [
 ]
 
 app = FastAPI(middleware=middleware)
+api = FastAPI() 
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,7 +70,8 @@ app.add_middleware(
 )
 
 from fastapi.responses import HTMLResponse
-app.mount("/app", StaticFiles(directory="app", html=True), name="app")
+app.mount("/api", api)
+app.mount("/", StaticFiles(directory="app", html=True), name="")
  
 from sqlalchemy.orm import selectinload
 
@@ -99,7 +101,7 @@ from typing import List
 
 session = get_session() 
 
-@app.get("/attacks", response_model=List[AttackSimple])
+@api.get("/attacks", response_model=List[AttackSimple])
 def read_attacks(
         session: Session = Depends(get_session),
         offset: int = 0,
@@ -116,7 +118,7 @@ def read_attacks(
                                Attack.description).offset(offset).limit(limit)).all()
 
 
-@app.post("/attacks")
+@api.post("/attacks")
 def get_multiple_attacks_for_attack(
         attackList: List[int],
         session: Session = Depends(get_session)):
@@ -132,7 +134,7 @@ def get_multiple_attacks_for_attack(
     return response
 
 
-@app.get("/attacks/{attack_id}")
+@api.get("/attacks/{attack_id}")
 def get_payload_options_for_attack(
         attack_id: int,
         session: Session = Depends(get_session)):
@@ -219,7 +221,8 @@ def get_single_attack(attack: Attack):
             "module_options": option_headings,
             "target_options": targets,
             "target": attack.target,
-            "session_required": attack.session_required}
+            "session_required": attack.session_required
+            }
 
    
 import os 
