@@ -18,6 +18,11 @@ EXPOSE $PORT
 CMD uvicorn main:app --host 0.0.0.0 --port $PORT
 
 
-# docker buildx build .  -t registry.heroku.com/metasploit-gui/web  --provenance=false --push 
-# heroku container:release web -a metasploit-gui 
-# heroku logs --tail 
+# sudo groupadd docker 2>/dev/null || true
+# sudo usermod -aG docker "$USER"
+# docker login 
+# heroky login 
+# heroku container:login
+# sudo docker buildx build .  -t registry.heroku.com/metasploit-gui/web  --provenance=false --push 
+# sudo heroku container:release web -a metasploit-gui 
+# sudo heroku logs --tail 

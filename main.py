@@ -102,7 +102,7 @@ from typing import List
 session = get_session() 
 
 @api.get("/attacks", response_model=List[AttackSimple])
-def read_attacks(
+async def read_attacks(
         session: Session = Depends(get_session),
         offset: int = 0,
         limit: int = 100 
